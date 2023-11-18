@@ -128,8 +128,17 @@ void MassSpringSystemSimulator::drawFrame(ID3D11DeviceContext* pd3dImmediateCont
 
 void MassSpringSystemSimulator::notifyCaseChanged(int testCase)
 {
+	m_iTestCase = testCase;
 	// Reset, so console log is activated again for next demo 
 	isFirstStep = true;
+
+	if (testCase == 0) {
+		isGravityEnabled = false;
+		isCollisionEnabled = false;
+		m_iIntegrator = EULER;
+		runDemo1();
+		return;
+	}
 
 	if (testCase == 2 || testCase == 3) {
 		m_iIntegrator = MIDPOINT;
@@ -219,6 +228,10 @@ void MassSpringSystemSimulator::integrateMidpoint(float timeStep) {
 
 void MassSpringSystemSimulator::simulateTimestep(float timeStep)
 {
+	if (m_iTestCase == 0) {
+		return;
+	}
+
 	for each (MassPoint * p in massPoints) p->clearForce(isGravityEnabled);
 	for each (Spring *s in springs) s->addElasticForceToPoints();
 
@@ -391,13 +404,27 @@ void MassSpringSystemSimulator::setupComplexEnvironment() {
 }
 
 void MassSpringSystemSimulator::printMasspointStates() {
-	std::cout << "Integration Method: " + to_string(m_iIntegrator) << "\n";
-
 	for (int i = 0; i < massPoints.size(); ++i) std::cout << "Point " + std::to_string(i) + ": " + massPoints[i]->toString() + "\n";
 }
 
 void MassSpringSystemSimulator::addSpringToTeapot(int masspoint, float initialLength, float stiffness)
 {
 	springs.push_back(new Spring(massPoints[masspoint], teapot, initialLength, stiffness));
+}
+
+void MassSpringSystemSimulator::runDemo1() {
+	setupSimpleEnvironment();
+	for each (MassPoint * p in massPoints) p->clearForce(isGravityEnabled);
+	for each (Spring * s in springs) s->addElasticForceToPoints();
+	integrateEuler(0.1);
+	std::cout << "Euler:" << std::endl;
+	printMasspointStates();
+
+	setupSimpleEnvironment();
+	for each (MassPoint * p in massPoints) p->clearForce(isGravityEnabled);
+	for each (Spring * s in springs) s->addElasticForceToPoints();
+	integrateMidpoint(0.1);
+	std::cout << "Midpoint:" << std::endl;
+	printMasspointStates();
 }
 

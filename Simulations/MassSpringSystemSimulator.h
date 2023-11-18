@@ -98,6 +98,7 @@ private:
 	void integrateLeapfrog(float timeStep);
 	void handleCollisions();
 	void printMasspointStates();
+	void runDemo1();
 
 	MassPoint *teapot;
 	Vec3  m_vfMovableObjectFinalPos;
