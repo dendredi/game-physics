@@ -6,6 +6,21 @@
 
 #define TESTCASEUSEDTORUNTEST 2
 
+class RigidBody {
+public:
+	Mat4 I_0;
+
+	Vec3 position;
+	Quat rotation;
+
+	RigidBody(Vec3 position, Quat rotatio, float width, float height, float depth);
+	
+	Mat4 getObject2WorldMatrix();
+
+private:
+	void init_I_0(float width, float height, float depth);
+};
+
 class RigidBodySystemSimulator:public Simulator{
 public:
 	// Construtors
@@ -42,5 +57,10 @@ private:
 	Point2D m_mouse;
 	Point2D m_trackmouse;
 	Point2D m_oldtrackmouse;
+
+	// Own stuff
+	std::vector<RigidBody*> rigidBodies;
+	void runDemo1();
+
 	};
 #endif
