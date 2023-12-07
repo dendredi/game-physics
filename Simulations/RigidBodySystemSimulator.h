@@ -6,20 +6,52 @@
 
 #define TESTCASEUSEDTORUNTEST 2
 
+class ExternalForce {
+public:
+
+	Vec3 force;
+	Vec3 position;
+
+	ExternalForce(Vec3 force, Vec3 position) {
+		this->force = force;
+		this->position = position;
+	}
+
+	// TODO: Check if x_cm - position is needed
+	Vec3 convertToTorque() {
+		return cross(force, position);
+	}
+};
+
 class RigidBody {
 public:
-	Mat4 I_0;
+	Mat4 Inverse_I_0;
 
-	Vec3 position;
-	Quat rotation;
+	Mat4 position_x;
+	Quat orientation_r;
 
-	RigidBody(Vec3 position, Quat rotatio, float width, float height, float depth);
+	float mass_m;
+
+	Vec3 linearVelocity_v;
+	Vec3 angularVelocity_w;
+	Vec3 angularMomentum_L;
+
+	RigidBody(Mat4 position_x, Quat orientation_r, float width, float height, float depth, float mass_m);
 	
+	Mat4 getInverseInertiaTensor();
 	Mat4 getObject2WorldMatrix();
+	Quat getAngularVelocityQuat();
+
+	void applyExternalForce(ExternalForce force);
+	Vec3 sumTotalTorque();
+
+	void printState();
 
 private:
-	void init_I_0(float width, float height, float depth);
+	void initInverse_I_0(float width, float height, float depth);
+	std::vector<ExternalForce> externalForces;
 };
+
 
 class RigidBodySystemSimulator:public Simulator{
 public:
@@ -60,6 +92,8 @@ private:
 
 	// Own stuff
 	std::vector<RigidBody*> rigidBodies;
+
+	void initSimpleSetup();
 	void runDemo1();
 
 	};
