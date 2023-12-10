@@ -60,10 +60,10 @@ Mat4 RigidBody::getObject2WorldMatrix() {
 	return scaleMat * orientation_r.getRotMat() * translatMat; // scaleMat * rotMat * translatMat;
 }
 
-// TODO: Verify
+// 0 at last position!!
 Quat RigidBody::getAngularVelocityQuat()
 {
-	return Quat(0, angularVelocity_w.x, angularVelocity_w.y, angularVelocity_w.z);
+	return Quat(angularVelocity_w.x, angularVelocity_w.y, angularVelocity_w.z, 0);
 }
 
 void RigidBody::applyExternalForce(ExternalForce *force)
@@ -238,6 +238,14 @@ void RigidBodySystemSimulator::simulateTimestep(float timeStep)
 	simulateTimestep_Impl(timeStep * timeFactor);
 }
 
+Quat normalzeQuat(Quat quaternion) {
+	auto norm = quaternion.norm();
+	if (norm > 0) {
+		quaternion /= norm;
+	}
+	return quaternion;
+}
+
 void RigidBodySystemSimulator::simulateTimestep_Impl(float timeStep)
 {
 	for each (auto body in rigidBodies) {
@@ -253,24 +261,30 @@ void RigidBodySystemSimulator::simulateTimestep_Impl(float timeStep)
 		/* Angular Part */
 
 		// Integrate Orientation r
-		body->orientation_r += (body->getAngularVelocityQuat() * body->orientation_r) * (timeStep / 2); // TODO: Verify
-		body->orientation_r /= body->orientation_r.norm(); // Normalize
+		Quat wr = body->getAngularVelocityQuat() * body->orientation_r;
+		body->orientation_r += timeStep / 2 * wr; // TODO: Verify
+		body->orientation_r = normalzeQuat(body->orientation_r);
 
 		// Integrate Angular Momentum L
 		body->angularMomentum_L += body->sumTotalTorque_q() * timeStep;
 
 		// Update angular velocity using I and L
 		body->angularVelocity_w = body->getInverseInertiaTensorRotated().transformVector(body->angularMomentum_L);
-
-		int x = 0;
 	}
 }
 
-
 void RigidBodySystemSimulator::handleCollisions()
 {
-	RigidBody *A = rigidBodies[0];
-	RigidBody *B = rigidBodies[1];
+	for (int i = 0; i < rigidBodies.size(); i++) {
+		for (int j = 0; j < i; j++) {
+			handleOneCollision(i, j);
+		}
+	}
+}
+void RigidBodySystemSimulator::handleOneCollision(int indexA, int indexB)
+{
+	RigidBody *A = rigidBodies[indexA];
+	RigidBody *B = rigidBodies[indexB];
 
 	auto info = checkCollisionSAT(A->getObject2WorldMatrix(), B->getObject2WorldMatrix());
 	if (!info.isValid) return;
@@ -306,17 +320,18 @@ void RigidBodySystemSimulator::handleCollisions()
 
 	/* Update */
 
+	Vec3 Jn = J * n;
+
 	// Linear
-	A->linearVelocity_v += J * n / A->mass_m;
-	B->linearVelocity_v -= J * n / B->mass_m;
+	A->linearVelocity_v += Jn / A->mass_m;
+	B->linearVelocity_v -= Jn / B->mass_m;
 
 	std::cout << "v_A: " << A->linearVelocity_v << endl;
 	std::cout << "v_B: " << B->linearVelocity_v << endl;
 
-
 	// Angular
-	A->angularMomentum_L += cross(x_a, J * n);
-	B->angularMomentum_L -= cross(x_b, J * n);
+	A->angularMomentum_L += cross(x_a, Jn);
+	B->angularMomentum_L -= cross(x_b, Jn);
 
 	std::cout << "L_A: " << A->angularMomentum_L << endl;
 	std::cout << "L_B: " << B->angularMomentum_L << endl;

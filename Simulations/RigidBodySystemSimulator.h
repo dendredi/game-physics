@@ -99,6 +99,7 @@ private:
 	void initManyBodySetup();
 	void runDemo1();
 	void handleCollisions();
+	void handleOneCollision(int indexA, int indexB);
 	void simulateTimestep_Impl(float timeStep);
 
 	ExternalForce *additionalExternalForce;
