@@ -231,9 +231,7 @@ void RigidBodySystemSimulator::simulateTimestep(float timeStep)
 		return;
 	}
 
-	if (m_iTestCase == 2) {
-		handleCollisions();
-	}
+	handleCollisions();
 
 	simulateTimestep_Impl(timeStep * timeFactor);
 }
@@ -474,7 +472,49 @@ void RigidBodySystemSimulator::initTwoBodySetup()
 void RigidBodySystemSimulator::initManyBodySetup()
 {
 	rigidBodies.clear();
-	// Todo
+	
+	// Wall
+	Vec3 position_1 = Vec3(0, 0, 0);
+	Vec3 size_1 = Vec3(0.1, 1, 2);
+	Mat4 rotMat_1 = Mat4();
+	rotMat_1.initRotationXYZ(0, 0, 0);
+	Quat orientation_1 = Quat(rotMat_1);
+	float mass_1 = size_1.x * size_1.y * size_1.z;
+
+	// right
+	Vec3 position_2 = Vec3(2, 0.5, 0);
+	Vec3 size_2 = Vec3(0.3, 0.3, 0.3);
+	Mat4 rotMat_2 = Mat4();
+	rotMat_2.initRotationXYZ(0, 45, 45);
+	Quat orientation_2 = Quat(rotMat_2);
+	float mass_2 = size_2.x * size_2.y * size_2.z * 100;
+
+	// left
+	Vec3 position_3 = - position_2;
+	Vec3 size_3 = - size_2;
+	Quat orientation_3 = orientation_2;
+	float mass_3 = size_3.x * size_3.y * size_3.z * 100;
+
+	Vec3 position_4 = Vec3(1, 1, 1);
+	Vec3 size_4 = Vec3(0.2, 0.2, 0.2);
+	Mat4 rotMat_4 = Mat4();
+	rotMat_4.initRotationXYZ(0, 0, 0);
+	Quat orientation_4 = Quat(rotMat_4);
+	float mass_4 = size_4.x * size_4.y * size_4.z;
+
+
+	RigidBody* wall = new RigidBody(position_1, orientation_1, size_1, mass_1);
+	RigidBody* right = new RigidBody(position_2, orientation_2, size_2, mass_2);
+	RigidBody* left = new RigidBody(position_3, orientation_3, size_3, mass_3);
+	RigidBody* top = new RigidBody(position_4, orientation_4, size_4, mass_4);
+
+	right->linearVelocity_v = Vec3(-1.5, 0, 0);
+	left->linearVelocity_v = Vec3(1.5, 0, 0);
+
+	rigidBodies.push_back(wall);
+	rigidBodies.push_back(right);
+	rigidBodies.push_back(left);
+	rigidBodies.push_back(top);
 }
 
 
