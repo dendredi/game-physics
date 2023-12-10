@@ -8,26 +8,20 @@
 
 class ExternalForce {
 public:
-
 	Vec3 force;
 	Vec3 position;
 
-	ExternalForce(Vec3 force, Vec3 position) {
-		this->force = force;
-		this->position = position;
-	}
+	ExternalForce(Vec3 force, Vec3 position);
 
-	// TODO: Check if x_cm - position is needed
-	Vec3 convertToTorque() {
-		return cross(force, position);
-	}
+	Vec3 convertToTorque(Vec3 centerOfMass);
 };
 
 class RigidBody {
 public:
 	Mat4 Inverse_I_0;
 
-	Mat4 position_x;
+	Vec3 position_x;
+	Vec3 size;
 	Quat orientation_r;
 
 	float mass_m;
@@ -36,20 +30,25 @@ public:
 	Vec3 angularVelocity_w;
 	Vec3 angularMomentum_L;
 
-	RigidBody(Mat4 position_x, Quat orientation_r, float width, float height, float depth, float mass_m);
+	std::vector<ExternalForce*> externalForces;
+
+	RigidBody(Vec3 position_x, Quat orientation_r, Vec3 size, float mass_m);
 	
-	Mat4 getInverseInertiaTensor();
+	Mat4 getInverseInertiaTensorRotated();
 	Mat4 getObject2WorldMatrix();
 	Quat getAngularVelocityQuat();
 
-	void applyExternalForce(ExternalForce force);
-	Vec3 sumTotalTorque();
+	void applyExternalForce(ExternalForce *force);
+	Vec3 sumTotalForce_F();
+	Vec3 sumTotalTorque_q();
+
+	Vec3 localToWoldPosition(Vec3 localPosition);
+	Vec3 getTotalVelocityAtLocalPositiion(Vec3 localPosition);
 
 	void printState();
 
 private:
-	void initInverse_I_0(float width, float height, float depth);
-	std::vector<ExternalForce> externalForces;
+	void initInverse_I_0();
 };
 
 
@@ -91,10 +90,20 @@ private:
 	Point2D m_oldtrackmouse;
 
 	// Own stuff
+	float timeFactor;
+
 	std::vector<RigidBody*> rigidBodies;
 
-	void initSimpleSetup();
+	void initSingleBodySetup();
+	void initTwoBodySetup();
+	void initManyBodySetup();
 	void runDemo1();
+	void handleCollisions();
+	void simulateTimestep_Impl(float timeStep);
+
+	ExternalForce *additionalExternalForce;
+	Vec3  m_vfMovableObjectFinalPos;
+
 
 	};
 #endif
