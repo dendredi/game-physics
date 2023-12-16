@@ -102,8 +102,9 @@ private:
 	void handleOneCollision(int indexA, int indexB);
 	void simulateTimestep_Impl(float timeStep);
 
-	ExternalForce *additionalExternalForce;
 	Vec3  m_vfMovableObjectFinalPos;
+	bool chargingForce = false;
+	int selectedObject_Demo4;
 
 
 	};

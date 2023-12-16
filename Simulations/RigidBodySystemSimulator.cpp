@@ -120,8 +120,7 @@ RigidBodySystemSimulator::RigidBodySystemSimulator()
 	m_iTestCase = 0;
 	timeFactor = 1.0f;
 
-	// For Demo 2
-	this->additionalExternalForce = new ExternalForce(Vec3(1, 1, 1), Vec3());
+	selectedObject_Demo4 = 0;
 }
 
 const char* RigidBodySystemSimulator::getTestCasesStr()
@@ -134,6 +133,17 @@ void RigidBodySystemSimulator::initUI(DrawingUtilitiesClass* DUC)
 	this->DUC = DUC;
 
 	TwAddVarRW(DUC->g_pTweakBar, "Time Factor", TW_TYPE_FLOAT, &timeFactor, "min=0.1 step=0.1");
+
+	if (m_iTestCase == 3) {
+		TwEnumVal enumVals[] = {
+		{ 0, "Wall" },
+		{ 1, "Left" },
+		{ 2, "Right" },
+		{ 3, "Top" },
+		};
+		TwType TW_TYPE_TESTCASE = TwDefineEnum("Target Object", enumVals, 4);
+		TwAddVarRW(DUC->g_pTweakBar, "Target Object", TW_TYPE_TESTCASE, &selectedObject_Demo4, "");
+	}
 }
 
 void RigidBodySystemSimulator::reset()
@@ -149,10 +159,18 @@ void RigidBodySystemSimulator::drawFrame(ID3D11DeviceContext* pd3dImmediateConte
 		return;
 	}
 
-	DUC->setUpLighting(Vec3(0, 0, 0), 0.4 * Vec3(1, 1, 1), 2000.0, Vec3(0.5, 0.5, 0.5));
+	for (int i = 0; i < rigidBodies.size(); ++i) {
+		auto body = rigidBodies.at(i);
 
-	for each(auto body in rigidBodies) {
+		if (m_iTestCase == 3 && i == selectedObject_Demo4) {
+			DUC->setUpLighting(Vec3(255, 0, 0), 0.4 * Vec3(1, 1, 1), 2000.0, Vec3(0.5, 0.5, 0.5));
+		}
+		else {
+			DUC->setUpLighting(Vec3(0, 0, 0), 0.4 * Vec3(1, 1, 1), 2000.0, Vec3(0.5, 0.5, 0.5));
+		}
+
 		DUC->drawRigidBody(body->getObject2WorldMatrix());
+
 		for each (auto eForce in body->externalForces) {
 
 			// Draw connection of force point and midpoint
@@ -185,8 +203,6 @@ void RigidBodySystemSimulator::notifyCaseChanged(int testCase)
 
 	if (testCase == 1) {
 		initSingleBodySetup();
-		additionalExternalForce = new ExternalForce(Vec3(1, 1, 1), Vec3());
-		rigidBodies[0]->applyExternalForce(additionalExternalForce);
 	}
 	else if (testCase == 2) {
 		initTwoBodySetup();
@@ -203,26 +219,6 @@ void RigidBodySystemSimulator::notifyCaseChanged(int testCase)
 void RigidBodySystemSimulator::externalForcesCalculations(float timeElapsed)
 {
 
-	if (m_iTestCase == 1) {
-		// Apply the mouse deltas to g_vfMovableObjectPos (move along cameras view plane)
-		Point2D mouseDiff;
-		mouseDiff.x = m_trackmouse.x - m_oldtrackmouse.x;
-		mouseDiff.y = m_trackmouse.y - m_oldtrackmouse.y;
-		if (mouseDiff.x != 0 || mouseDiff.y != 0)
-		{
-			Mat4 worldViewInv = Mat4(DUC->g_camera.GetWorldMatrix() * DUC->g_camera.GetViewMatrix());
-			worldViewInv = worldViewInv.inverse();
-			Vec3 inputView = Vec3((float)mouseDiff.x, (float)-mouseDiff.y, 0);
-			Vec3 inputWorld = worldViewInv.transformVectorNormal(inputView);
-			// find a proper scale!
-			float inputScale = 0.001f;
-			inputWorld = inputWorld * inputScale;
-			additionalExternalForce->position = m_vfMovableObjectFinalPos + inputWorld;
-		}
-		else {
-			m_vfMovableObjectFinalPos = additionalExternalForce->position;
-		}
-	}
 }
 
 void RigidBodySystemSimulator::simulateTimestep(float timeStep)
@@ -292,11 +288,6 @@ void RigidBodySystemSimulator::handleOneCollision(int indexA, int indexB)
 
 	Vec3 x_a = info.collisionPointWorld - A->position_x;
 	Vec3 x_b = info.collisionPointWorld - B->position_x;
-
-	std::cout << "x_a: " << x_a << endl;
-	std::cout << "x_b: " << x_b << endl;
-
-	std::cout << "n: " << n << endl;
 	
 	Vec3 v_rel = A->getTotalVelocityAtLocalPositiion(x_a) - B->getTotalVelocityAtLocalPositiion(x_b);
 	
@@ -312,10 +303,6 @@ void RigidBodySystemSimulator::handleOneCollision(int indexA, int indexB)
 		cross(B->getInverseInertiaTensorRotated().transformVector(cross(x_b, n)), x_b);
 	auto J = (-(1+c) * v_rel_dot_n) / ((1 / A->mass_m) + (1 / B->mass_m) + dot(intermediate, n));
 
-	std::cout << "J: " << J << endl;
-	std::cout << "J * n : " << (J * n) << std::endl;
-
-
 	/* Update */
 
 	Vec3 Jn = J * n;
@@ -324,25 +311,46 @@ void RigidBodySystemSimulator::handleOneCollision(int indexA, int indexB)
 	A->linearVelocity_v += Jn / A->mass_m;
 	B->linearVelocity_v -= Jn / B->mass_m;
 
-	std::cout << "v_A: " << A->linearVelocity_v << endl;
-	std::cout << "v_B: " << B->linearVelocity_v << endl;
-
 	// Angular
 	A->angularMomentum_L += cross(x_a, Jn);
 	B->angularMomentum_L -= cross(x_b, Jn);
-
-	std::cout << "L_A: " << A->angularMomentum_L << endl;
-	std::cout << "L_B: " << B->angularMomentum_L << endl;
 }
 
 void RigidBodySystemSimulator::onClick(int x, int y)
 {
 	m_trackmouse.x = x;
 	m_trackmouse.y = y;
+
+	if (!chargingForce) {
+		chargingForce = true;
+	}
 }
 
 void RigidBodySystemSimulator::onMouse(int x, int y)
 {
+	if (chargingForce) {
+		chargingForce = false;
+		// calculate
+		Point2D mouseDiff;
+		mouseDiff.x = m_trackmouse.x - m_oldtrackmouse.x;
+		mouseDiff.y = m_trackmouse.y - m_oldtrackmouse.y;
+		if (mouseDiff.x != 0 || mouseDiff.y != 0)
+		{
+			Mat4 worldViewInv = Mat4(DUC->g_camera.GetWorldMatrix() * DUC->g_camera.GetViewMatrix());
+			worldViewInv = worldViewInv.inverse();
+			Vec3 inputView = Vec3((float)mouseDiff.x, (float)-mouseDiff.y, 0);
+			Vec3 inputWorld = worldViewInv.transformVectorNormal(inputView);
+			std::cout << inputWorld << std::endl;
+			if (m_iTestCase == 1) {
+				applyForceOnBody(0, getPositionOfRigidBody(0), inputWorld * -0.01);
+			}
+			else if (m_iTestCase == 3) {
+				applyForceOnBody(selectedObject_Demo4, getPositionOfRigidBody(selectedObject_Demo4), inputWorld * -0.01);
+
+			}
+		}
+	}
+
 	m_oldtrackmouse.x = x;
 	m_oldtrackmouse.y = y;
 	m_trackmouse.x = x;
