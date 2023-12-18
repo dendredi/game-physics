@@ -9,7 +9,8 @@ DiffusionSimulator::DiffusionSimulator()
 	m_vfMovableObjectPos = Vec3();
 	m_vfMovableObjectFinalPos = Vec3();
 	m_vfRotate = Vec3();
-	// rest to be implemented
+
+	T = Grid(10, 10);
 }
 
 const char * DiffusionSimulator::getTestCasesStr(){

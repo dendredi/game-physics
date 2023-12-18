@@ -5,10 +5,48 @@
 #include "vectorbase.h"
 
 class Grid {
-	// to be implemented
+private:
+	int rows;
+	int cols;
+	float** matrix; // Pointer to a pointer for 2D array
+
+public:
+
+	Grid() : rows(0), cols(0) {
+
+	}
+
+	// Constructor to initialize the matrix with dynamic size
+	Grid(int numRows, int numCols) : rows(numRows), cols(numCols) {
+		// Allocate memory for rows
+		matrix = new float* [rows];
+
+		// Allocate memory for each column
+		for (int i = 0; i < rows; ++i) {
+			matrix[i] = new float[cols];
+		}
+	}
+
+	// Destructor to free allocated memory
+	~Grid() {
+		// Deallocate memory for each column
+		for (int i = 0; i < rows; ++i) {
+			delete[] matrix[i];
+		}
+
+		// Deallocate memory for rows
+		delete[] matrix;
+	}
+
+	// Accessor and mutator functions for the matrix elements
+	int get(int row, int col) const {
+		return matrix[row][col];
+	}
+
+	void set(int row, int col, float value) {
+		matrix[row][col] = value;
+	}
 };
-
-
 
 class DiffusionSimulator:public Simulator{
 public:
