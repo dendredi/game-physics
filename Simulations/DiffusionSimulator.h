@@ -6,46 +6,42 @@
 
 class Grid {
 private:
-	int rows;
-	int cols;
-	float** matrix; // Pointer to a pointer for 2D array
+	std::vector<float> matrix;
+public:
+	int rows; // y
+	int cols; // x
+
+	Grid();
+	Grid(int numRows, int numCols);
+	Grid(int numRows, int numCols, float *matrix);
+
+	~Grid();
+
+	float get(int row, int col) const;
+	void set(int row, int col, float value);
+
+	// Min and max values
+	std::pair<float, float> getValueInterval();
+
+	Grid convolution(Grid window);
+
+	std::string to_string();
+};
+
+class GridPixel {
+private:
+	Grid *grid;
+	int x, y;
+	std::pair<float, float> normInterval;
+	Mat4 object2WorldMatrix;
+	Vec3 color;
 
 public:
+	GridPixel(Grid* grid, int x, int y, std::pair<float, float> normInterval);
+	void update();
+	void draw(DrawingUtilitiesClass *DUC);
 
-	Grid() : rows(0), cols(0) {
-
-	}
-
-	// Constructor to initialize the matrix with dynamic size
-	Grid(int numRows, int numCols) : rows(numRows), cols(numCols) {
-		// Allocate memory for rows
-		matrix = new float* [rows];
-
-		// Allocate memory for each column
-		for (int i = 0; i < rows; ++i) {
-			matrix[i] = new float[cols];
-		}
-	}
-
-	// Destructor to free allocated memory
-	~Grid() {
-		// Deallocate memory for each column
-		for (int i = 0; i < rows; ++i) {
-			delete[] matrix[i];
-		}
-
-		// Deallocate memory for rows
-		delete[] matrix;
-	}
-
-	// Accessor and mutator functions for the matrix elements
-	int get(int row, int col) const {
-		return matrix[row][col];
-	}
-
-	void set(int row, int col, float value) {
-		matrix[row][col] = value;
-	}
+	static std::vector<GridPixel*> initPixelsFromGrid(Grid* grid);
 };
 
 class DiffusionSimulator:public Simulator{
@@ -67,8 +63,10 @@ public:
 	void drawObjects();
 
 	// Feel free to change the signature of these functions, add arguments, etc.
-	void diffuseTemperatureExplicit();
-	void diffuseTemperatureImplicit();
+	void diffuseTemperatureExplicit(float timeStep);
+	void diffuseTemperatureImplicit(float timeStep);
+
+	void updateDimensions(int m, int n);
 
 private:
 	// Attributes
@@ -79,6 +77,9 @@ private:
 	Point2D m_trackmouse;
 	Point2D m_oldtrackmouse;
 	Grid T;
+
+	std::vector<GridPixel*> pixels;
+	void updatePixels();
 };
 
 #endif
