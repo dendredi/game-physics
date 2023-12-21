@@ -6,38 +6,44 @@
 
 class Grid {
 private:
-	std::vector<float> matrix;
+	std::vector<Real> matrix;
 public:
 	int rows; // y
 	int cols; // x
 
 	Grid();
 	Grid(int numRows, int numCols);
-	Grid(int numRows, int numCols, float *matrix);
+	Grid(int numRows, int numCols, Real *matrix);
 
 	~Grid();
 
-	float get(int row, int col) const;
-	void set(int row, int col, float value);
+	Real get(int row, int col) const;
+	void set(int row, int col, Real value);
+
+	// Overloading the + operator
+	Grid operator*(const Real scalar) const;
 
 	// Min and max values
-	std::pair<float, float> getValueInterval();
+	std::pair<Real, Real> getValueInterval();
 
 	Grid convolution(Grid window);
 
 	std::string to_string();
+
+	std::vector<Real> to_vector();
+	void update_from_vector(std::vector<Real>);
 };
 
 class GridPixel {
 private:
 	Grid *grid;
 	int x, y;
-	std::pair<float, float> normInterval;
+	std::pair<Real, Real> normInterval;
 	Mat4 object2WorldMatrix;
 	Vec3 color;
 
 public:
-	GridPixel(Grid* grid, int x, int y, std::pair<float, float> normInterval);
+	GridPixel(Grid* grid, int x, int y, std::pair<Real, Real> normInterval);
 	void update();
 	void draw(DrawingUtilitiesClass *DUC);
 
@@ -67,6 +73,10 @@ public:
 	void diffuseTemperatureImplicit(float timeStep);
 
 	void updateDimensions(int m, int n);
+
+	void callbackSetM(const void* value, void* clientData);
+	void callbackSetN(const void* value, void* clientData);
+
 
 private:
 	// Attributes

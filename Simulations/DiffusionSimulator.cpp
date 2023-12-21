@@ -9,12 +9,12 @@ using namespace std;
 #define INIT_HIGH_TEMP 10
 
 void GridPixel::update() {
-	float value = grid->get(x, y);
+	Real value = grid->get(x, y);
 
-	float scaleX = 1.0 / grid->cols;
-	float scaleY = 1.0 / grid->rows;
+	Real scaleX = 1.0 / grid->cols;
+	Real scaleY = 1.0 / grid->rows;
 
-	float normalizedValue = (value - normInterval.first) / (normInterval.second - normInterval.first);
+	Real normalizedValue = (value - normInterval.first) / (normInterval.second - normInterval.first);
 
 	Mat4 posMat = Mat4();
 	posMat.initTranslation(
@@ -51,7 +51,7 @@ std::vector<GridPixel*> GridPixel::initPixelsFromGrid(Grid* grid)
 	return pixels;
 }
 
-GridPixel::GridPixel(Grid *grid, int x, int y, std::pair<float, float> normInterval) : grid(grid), x(x), y(y), normInterval(normInterval) {
+GridPixel::GridPixel(Grid *grid, int x, int y, std::pair<Real, Real> normInterval) : grid(grid), x(x), y(y), normInterval(normInterval) {
 	update();
 }
 
@@ -67,7 +67,7 @@ Grid::Grid(int numRows, int numCols) : rows(numRows), cols(numCols) {
 	matrix.assign(numRows * numCols, 0);
 }
 
-Grid::Grid(int numRows, int numCols, float *initMatrix) : Grid(numRows, numCols) {
+Grid::Grid(int numRows, int numCols, Real *initMatrix) : Grid(numRows, numCols) {
 	for (int i = 0; i < numRows; ++i) {
 		for (int j = 0; j < numCols; ++j) {
 			matrix.at(i * cols + j) = initMatrix[i * cols + j];
@@ -80,25 +80,35 @@ Grid::~Grid() {
 }
 
 // Accessor and mutator functions for the matrix elements
-float Grid::get(int row, int col) const {
+Real Grid::get(int row, int col) const {
 	return matrix.at(row * cols + col);
 }
 
-void Grid::set(int row, int col, float value) {
+void Grid::set(int row, int col, Real value) {
 	matrix.at(row * cols + col) = value;
 }
 
-std::pair<float, float> Grid::getValueInterval()
-{
-	float min = matrix[0], max = matrix[0];
+Grid Grid::operator*(const Real scalar) const {
+	Grid result(rows, cols);
+	for (int i = 0; i < rows; ++i) {
+		for (int j = 0; j < cols; ++j) {
+			result.set(i, j, get(i, j) * scalar);
+		}
+	}
+	return result;
+}
 
-	for each (float value in matrix)
+std::pair<Real, Real> Grid::getValueInterval()
+{
+	Real min = matrix[0], max = matrix[0];
+
+	for each (Real value in matrix)
 	{
 		if (value < min) min = value;
 		if (value > max) max = value;
 	}
 
-	return std::pair<float, float>(min, max);
+	return std::pair<Real, Real>(min, max);
 }
 
 Grid Grid::convolution(Grid window)
@@ -106,7 +116,7 @@ Grid Grid::convolution(Grid window)
 	Grid out(rows - window.rows + 1, cols - window.cols + 1);
 	for (int out_i = 0; out_i < out.rows; ++out_i) {
 		for (int out_j = 0; out_j < out.cols; ++out_j) {
-			float value = 0;
+			Real value = 0;
 			for (int w_i = 0; w_i < window.rows; ++w_i) {
 				for (int w_j = 0; w_j < window.cols; ++w_j) {
 					value += window.get(w_i, w_j) * get(out_i + w_i, out_j + w_j);
@@ -130,6 +140,16 @@ std::string Grid::to_string()
 	}
 
 	return out;
+}
+
+std::vector<Real> Grid::to_vector()
+{
+	return matrix; // TODO: CHECK!!!
+}
+
+void Grid::update_from_vector(std::vector<Real> newVector)
+{
+	matrix = newVector;
 }
 
 // --
@@ -173,10 +193,21 @@ void DiffusionSimulator::reset(){
 		m_oldtrackmouse.x = m_oldtrackmouse.y = 0;
 }
 
+void DiffusionSimulator::callbackSetM(const void* value, void* clientData) {
+	//updateDimensions(value, T.cols);
+}
+
+void DiffusionSimulator::callbackSetN(const void* value, void* clientData) {
+	//updateDimensions(T.rows, value);
+}
+
 void DiffusionSimulator::initUI(DrawingUtilitiesClass * DUC)
 {
 	this->DUC = DUC;
-	updateDimensions(T.rows, T.cols); // TODO: Change this.
+	updateDimensions(T.rows, T.cols);
+
+	// TODO
+	//TwAddVarCB(DUC->g_pTweakBar, "m", TW_TYPE_INT32, callbackSetM, NULL, NULL, "min=10 max=100");
 
 }
 
@@ -203,8 +234,8 @@ void DiffusionSimulator::notifyCaseChanged(int testCase)
 }
 
 void DiffusionSimulator::diffuseTemperatureExplicit(float timeStep) {
-	float window[9] = {0.0, 1.0, 0.0, 1.0, -4.0, 1.0, 0.0, 1.0, 0.0};
-	Grid laplace = T.convolution(Grid(3, 3, window));
+	Real window[9] = {0.0, 1.0, 0.0, 1.0, -4.0, 1.0, 0.0, 1.0, 0.0};
+	Grid laplace = T.convolution(Grid(3, 3, window)) * (1.0f / timeStep * timeStep); // TODO: Check !!! 
 
 	for (int i = 0; i < T.rows; ++i) {
 		for (int j = 0; j < T.cols; ++j) {
@@ -212,9 +243,9 @@ void DiffusionSimulator::diffuseTemperatureExplicit(float timeStep) {
 				// Do not touch borders
 			}
 			else {
-				float currentValue = T.get(i, j);
-				float time_derivative_ij = ALPHA * laplace.get(i - 1, j - 1);
-				float newValue = currentValue + time_derivative_ij * timeStep;
+				Real currentValue = T.get(i, j);
+				Real time_derivative_ij = ALPHA * laplace.get(i - 1, j - 1);
+				Real newValue = currentValue + time_derivative_ij * timeStep;
 				T.set(i, j, newValue);
 			}
 		}
@@ -223,7 +254,64 @@ void DiffusionSimulator::diffuseTemperatureExplicit(float timeStep) {
 
 
 void DiffusionSimulator::diffuseTemperatureImplicit(float timeStep) {
-	// solve A T = b
+	// solve A x = b
+
+	const int N = T.cols * T.rows;
+
+	SparseMatrix<Real> A(N);
+	std::vector<Real> b(N);
+
+	Real lambda = ALPHA * timeStep / (1 * 1); // TODO: WTF
+
+	/*
+	assemble the system matrix A 
+	*/
+	
+	// First row
+	std::vector<int> indices{ 0, 1 };
+	std::vector<Real> values{ 1.0f + 2.0f * lambda, - lambda };
+	A.add_sparse_row(0, indices, values);
+
+	// Last row
+	indices = std::vector<int>{ N-2, N-1 };
+	values = std::vector<Real>{ -lambda,  1.0f + 2.0f * lambda };
+	A.add_sparse_row(N - 1, indices, values);
+
+	// In between
+	values = std::vector<Real>{ -lambda,  1.0f + 2.0f * lambda, -lambda };
+	for (int i = 1; i < N - 1; ++i) {
+		indices = std::vector<int>{ i - 1, i, i + 1 };
+		A.add_sparse_row(i, indices, values);
+	}
+
+	/*
+	assemble the right - hand side b
+	*/
+
+	b = T.to_vector();
+
+
+	/* --- Do not touch --- */
+	Real pcg_target_residual = 1e-05;
+	Real pcg_max_iterations = 1000;
+	Real ret_pcg_residual = 1e10;
+	int  ret_pcg_iterations = -1;
+
+	SparsePCGSolver<Real> solver;
+	solver.set_solver_parameters(pcg_target_residual, pcg_max_iterations, 0.97, 0.25);
+
+	std::vector<Real> x(N);
+	for (int j = 0; j < N; ++j) { x[j] = 0.; }
+
+	solver.solve(A, b, x, ret_pcg_residual, ret_pcg_iterations, 0);
+	/* --- Do not touch --- */
+
+
+	T.update_from_vector(x);
+}
+
+void diffuseTemperatureImplicit_TEMPLATE(float timeStep) {
+	// solve A x = b
 
 	// This is just an example to show how to work with the PCG solver,
 	const int nx = 5;
