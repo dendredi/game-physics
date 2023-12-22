@@ -261,12 +261,13 @@ void DiffusionSimulator::diffuseTemperatureImplicit(float timeStep) {
 	SparseMatrix<Real> A(N);
 	std::vector<Real> b(N);
 
-	Real lambda = ALPHA * timeStep / (1 * 1); // TODO: WTF
+	Real lambda = ALPHA * timeStep / (1 * 1); // TODO: WTF, dont worry be happy
 
 	/*
 	assemble the system matrix A 
 	*/
 	
+	/*
 	// First row
 	std::vector<int> indices{ 0, 1 };
 	std::vector<Real> values{ 1.0f + 2.0f * lambda, - lambda };
@@ -282,6 +283,15 @@ void DiffusionSimulator::diffuseTemperatureImplicit(float timeStep) {
 	for (int i = 1; i < N - 1; ++i) {
 		indices = std::vector<int>{ i - 1, i, i + 1 };
 		A.add_sparse_row(i, indices, values);
+	}
+	*/
+
+	for (int i = 0; i < T.rows; i++) {
+		for (int j = 0; j < T.cols; j++) {
+			A.set_element(i, j, (1.0f + 4.0f * lambda));
+
+
+		}
 	}
 
 	/*
@@ -359,6 +369,16 @@ void DiffusionSimulator::updateDimensions(int m, int n)
 void DiffusionSimulator::updatePixels()
 {
 	for each (auto pixel in pixels) pixel->update();
+}
+
+int DiffusionSimulator::ijToN(int i, int j, int cols, int rows)
+{
+	return i * cols + j;
+}
+
+std::pair<int, int> DiffusionSimulator::nToIJ(int n, int cols, int rows)
+{
+	return std::pair<int, int>();
 }
 
 

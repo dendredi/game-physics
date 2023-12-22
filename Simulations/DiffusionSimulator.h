@@ -1,6 +1,8 @@
 #ifndef DIFFUSIONSIMULATOR_h
 #define DIFFUSIONSIMULATOR_h
 
+#include <utility>
+
 #include "Simulator.h"
 #include "vectorbase.h"
 
@@ -86,10 +88,16 @@ private:
 	Point2D m_mouse;
 	Point2D m_trackmouse;
 	Point2D m_oldtrackmouse;
+
+	/// Temperature Grid
 	Grid T;
 
 	std::vector<GridPixel*> pixels;
 	void updatePixels();
+
+	///help ij to n
+	int ijToN(int i, int j, int cols, int rows);
+	std::pair<int, int> nToIJ(int n, int cols, int rows);
 };
 
 #endif
