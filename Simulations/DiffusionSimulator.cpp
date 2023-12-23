@@ -242,7 +242,7 @@ void DiffusionSimulator::notifyCaseChanged(int testCase)
 
 void DiffusionSimulator::diffuseTemperatureExplicit(float timeStep) {
 	Real window[9] = {0.0, 1.0, 0.0, 1.0, -4.0, 1.0, 0.0, 1.0, 0.0};
-	Grid laplace = T.convolution(Grid(3, 3, window)) * (1.0f / timeStep * timeStep); // TODO: Check !!! 
+	Grid laplace = T.convolution(Grid(3, 3, window));
 
 	for (int i = 0; i < T.rows; ++i) {
 		for (int j = 0; j < T.cols; ++j) {
@@ -268,7 +268,7 @@ void DiffusionSimulator::diffuseTemperatureImplicit(float timeStep) {
 	SparseMatrix<Real> A(N);
 	std::vector<Real> b(N);
 
-	Real lambda = ALPHA * timeStep / (1 * 1); // TODO: WTF, dont worry be happy
+	Real lambda = ALPHA * timeStep; 
 
 	/*
 	assemble the system matrix A 
@@ -382,26 +382,11 @@ void DiffusionSimulator::updateDimensions(int m, int n)
 	this->pixels = GridPixel::initPixelsFromGrid(&T); // TODO Check if this is ok
 }
 
-void TW_CALL DiffusionSimulator::ApplyResize(void*)
-{
-	updateDimensions(newRowSize, newColumSize);
-}
 
 void DiffusionSimulator::updatePixels()
 {
 	for each (auto pixel in pixels) pixel->update();
 }
-
-int DiffusionSimulator::ijToN(int i, int j, int cols, int rows)
-{
-	return i * cols + j;
-}
-
-std::pair<int, int> DiffusionSimulator::nToIJ(int n, int cols, int rows)
-{
-	return std::pair<int, int>();
-}
-
 
 
 void DiffusionSimulator::simulateTimestep(float timeStep)

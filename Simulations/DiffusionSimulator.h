@@ -95,15 +95,9 @@ private:
 	int newColumSize = 32;
 	int newRowSize = 32;
 
-	/// brokennn
-	void TW_CALL ApplyResize(void*);
-
 	std::vector<GridPixel*> pixels;
 	void updatePixels();
 
-	///help ij to n
-	int ijToN(int i, int j, int cols, int rows);
-	std::pair<int, int> nToIJ(int n, int cols, int rows);
 };
 
 #endif
