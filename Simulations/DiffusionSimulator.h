@@ -1,8 +1,6 @@
 #ifndef DIFFUSIONSIMULATOR_h
 #define DIFFUSIONSIMULATOR_h
 
-#include <utility>
-
 #include "Simulator.h"
 #include "vectorbase.h"
 

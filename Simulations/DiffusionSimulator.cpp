@@ -206,15 +206,8 @@ void DiffusionSimulator::initUI(DrawingUtilitiesClass * DUC)
 	this->DUC = DUC;
 	updateDimensions(T.rows, T.cols);
 
-	// TODO
-	//TwAddVarCB(DUC->g_pTweakBar, "m", TW_TYPE_INT32, callbackSetM, NULL, NULL, "min=10 max=100");
-
-	// TODO uncurse
 	TwAddVarRW(DUC->g_pTweakBar, "m", TW_TYPE_INT32, &newColumSize, "min=10 max=100");
 	TwAddVarRW(DUC->g_pTweakBar, "n", TW_TYPE_INT32, &newRowSize, "min=10 max=100");
-
-	//TwAddButton(DUC->g_pTweakBar, "apply new size 'm x n'", NULL, NULL, "new size");
-	//TwAddButton(DUC->g_pTweakBar, "Resize to 'm x n'", ApplyResize, NULL, " label='apply the resize' ");
 
 }
 
