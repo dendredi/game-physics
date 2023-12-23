@@ -11,8 +11,8 @@ using namespace std;
 void GridPixel::update() {
 	Real value = grid->get(x, y);
 
-	Real scaleX = 1.0 / grid->cols;
-	Real scaleY = 1.0 / grid->rows;
+	Real scaleX = 1.0 / INIT_N;
+	Real scaleY = 1.0 / INIT_M;
 
 	Real normalizedValue = (value - normInterval.first) / (normInterval.second - normInterval.first);
 
@@ -181,6 +181,9 @@ DiffusionSimulator::DiffusionSimulator()
 	std::cout << "Window:" << endl << window.to_string();
 	std::cout << "Result:" << endl << result.to_string();
 	*/
+
+	alpha = ALPHA;
+
 }
 
 const char * DiffusionSimulator::getTestCasesStr(){
@@ -206,8 +209,11 @@ void DiffusionSimulator::initUI(DrawingUtilitiesClass * DUC)
 	this->DUC = DUC;
 	updateDimensions(T.rows, T.cols);
 
-	// TODO
-	//TwAddVarCB(DUC->g_pTweakBar, "m", TW_TYPE_INT32, callbackSetM, NULL, NULL, "min=10 max=100");
+	TwAddVarRW(DUC->g_pTweakBar, "m", TW_TYPE_INT32, &newColumSize, "min=10 max=100");
+	TwAddVarRW(DUC->g_pTweakBar, "n", TW_TYPE_INT32, &newRowSize, "min=10 max=100");
+	TwAddButton(DUC->g_pTweakBar, "set alpha to 3000 for unstable test", NULL, NULL, "");
+	TwAddVarRW(DUC->g_pTweakBar, "alpha", TW_TYPE_INT32, &alpha, "min=5 max=5000");
+
 
 }
 
@@ -226,6 +232,7 @@ void DiffusionSimulator::notifyCaseChanged(int testCase)
 		break;
 	case 1:
 		cout << "Implicit solver!\n";
+		//alpha = 300;
 		break;
 	default:
 		cout << "Empty Test!\n";
@@ -235,7 +242,7 @@ void DiffusionSimulator::notifyCaseChanged(int testCase)
 
 void DiffusionSimulator::diffuseTemperatureExplicit(float timeStep) {
 	Real window[9] = {0.0, 1.0, 0.0, 1.0, -4.0, 1.0, 0.0, 1.0, 0.0};
-	Grid laplace = T.convolution(Grid(3, 3, window)) * (1.0f / timeStep * timeStep); // TODO: Check !!! 
+	Grid laplace = T.convolution(Grid(3, 3, window));
 
 	for (int i = 0; i < T.rows; ++i) {
 		for (int j = 0; j < T.cols; ++j) {
@@ -244,7 +251,7 @@ void DiffusionSimulator::diffuseTemperatureExplicit(float timeStep) {
 			}
 			else {
 				Real currentValue = T.get(i, j);
-				Real time_derivative_ij = ALPHA * laplace.get(i - 1, j - 1);
+				Real time_derivative_ij = alpha * laplace.get(i - 1, j - 1);
 				Real newValue = currentValue + time_derivative_ij * timeStep;
 				T.set(i, j, newValue);
 			}
@@ -261,12 +268,13 @@ void DiffusionSimulator::diffuseTemperatureImplicit(float timeStep) {
 	SparseMatrix<Real> A(N);
 	std::vector<Real> b(N);
 
-	Real lambda = ALPHA * timeStep / (1 * 1); // TODO: WTF
+	Real lambda = alpha * timeStep; 
 
 	/*
 	assemble the system matrix A 
 	*/
 	
+	/*
 	// First row
 	std::vector<int> indices{ 0, 1 };
 	std::vector<Real> values{ 1.0f + 2.0f * lambda, - lambda };
@@ -283,6 +291,53 @@ void DiffusionSimulator::diffuseTemperatureImplicit(float timeStep) {
 		indices = std::vector<int>{ i - 1, i, i + 1 };
 		A.add_sparse_row(i, indices, values);
 	}
+	*/
+
+	int setter;
+	for (int i = 0; i < N; i++) {
+
+		int j = i % T.cols;
+		//int k = (i - j) / T.cols;
+		//std::cout << j << "|" << k << std::endl;
+
+		A.set_element(i, i, (1.0f + 4.0f * lambda)); // 2 2
+
+		if (i != 0 && j != 0) {
+			A.set_element(i, i - 1, (-lambda));	// 2 1
+		}
+
+		if (i != N - 1 && j != N - 1) {
+			A.set_element(i, i + 1, (-lambda)); // 2 3
+		}
+
+		setter = i - T.cols;
+		if (setter >= 0) {
+			A.set_element(i, setter, (-lambda)); // 1 2
+		}
+
+		setter = i + T.cols; 
+		if (setter < N) {
+			A.set_element(i, setter, (-lambda)); // 3 2
+		}
+
+		/*
+		setter = i - 1; //1
+		if (setter >= 0)
+			A.set_element(setter, i, (-lambda));//richtige coordinate offset? // 1 2
+		setter = i - T.cols;//richtige coordinate offset? // 2 - m ?? - value
+		if (setter >= 0) // no
+			A.set_element(setter, i, (-lambda));      // no
+		setter = i + 1; // 3
+		if (setter < N)
+			A.set_element(setter, i, (-lambda));
+		setter = i + T.cols;
+		if (setter < N)
+			A.set_element(setter, i, (-lambda));
+			*/
+	}
+
+	//A.set_element(0, 0, 1.0f);
+	//A.set_element(N - 1, N - 1, 1.0f);
 
 	/*
 	assemble the right - hand side b
@@ -308,6 +363,16 @@ void DiffusionSimulator::diffuseTemperatureImplicit(float timeStep) {
 
 
 	T.update_from_vector(x);
+
+	// null for boundary
+	for (int i = 0; i < T.rows; i++) {
+		T.set(i, 0, 0.0f);
+		T.set(i, T.cols - 1, 0.0f);
+	}
+	for (int j = 0; j < T.cols; j++) {
+		T.set(0, j, 0.0f);
+		T.set(T.rows - 1, j, 0.0f);
+	}
 }
 
 void diffuseTemperatureImplicit_TEMPLATE(float timeStep) {
@@ -356,11 +421,11 @@ void DiffusionSimulator::updateDimensions(int m, int n)
 	this->pixels = GridPixel::initPixelsFromGrid(&T); // TODO Check if this is ok
 }
 
+
 void DiffusionSimulator::updatePixels()
 {
 	for each (auto pixel in pixels) pixel->update();
 }
-
 
 
 void DiffusionSimulator::simulateTimestep(float timeStep)
@@ -377,6 +442,10 @@ void DiffusionSimulator::simulateTimestep(float timeStep)
 	}
 
 	updatePixels();
+
+	if (T.rows != newRowSize || T.cols != newColumSize) {
+		updateDimensions(newRowSize, newColumSize);
+	}
 }
 
 void DiffusionSimulator::drawObjects()

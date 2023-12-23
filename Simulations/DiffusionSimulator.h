@@ -77,6 +77,7 @@ public:
 	void callbackSetM(const void* value, void* clientData);
 	void callbackSetN(const void* value, void* clientData);
 
+	int alpha = 15;
 
 private:
 	// Attributes
@@ -86,10 +87,18 @@ private:
 	Point2D m_mouse;
 	Point2D m_trackmouse;
 	Point2D m_oldtrackmouse;
+
+	/// Temperature Grid
 	Grid T;
+
+	int newColumSize = 32;
+	int newRowSize = 32;
+
+	
 
 	std::vector<GridPixel*> pixels;
 	void updatePixels();
+
 };
 
 #endif
