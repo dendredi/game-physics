@@ -92,6 +92,12 @@ private:
 	/// Temperature Grid
 	Grid T;
 
+	int newColumSize = 32;
+	int newRowSize = 32;
+
+	/// brokennn
+	void TW_CALL ApplyResize(void*);
+
 	std::vector<GridPixel*> pixels;
 	void updatePixels();
 

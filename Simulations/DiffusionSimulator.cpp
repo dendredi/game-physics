@@ -209,6 +209,13 @@ void DiffusionSimulator::initUI(DrawingUtilitiesClass * DUC)
 	// TODO
 	//TwAddVarCB(DUC->g_pTweakBar, "m", TW_TYPE_INT32, callbackSetM, NULL, NULL, "min=10 max=100");
 
+	// TODO uncurse
+	TwAddVarRW(DUC->g_pTweakBar, "m", TW_TYPE_INT32, &newColumSize, "min=10 max=100");
+	TwAddVarRW(DUC->g_pTweakBar, "n", TW_TYPE_INT32, &newRowSize, "min=10 max=100");
+
+	//TwAddButton(DUC->g_pTweakBar, "apply new size 'm x n'", NULL, NULL, "new size");
+	//TwAddButton(DUC->g_pTweakBar, "Resize to 'm x n'", ApplyResize, NULL, " label='apply the resize' ");
+
 }
 
 void DiffusionSimulator::notifyCaseChanged(int testCase)
@@ -286,12 +293,21 @@ void DiffusionSimulator::diffuseTemperatureImplicit(float timeStep) {
 	}
 	*/
 
-	for (int i = 0; i < T.rows; i++) {
-		for (int j = 0; j < T.cols; j++) {
-			A.set_element(i, j, (1.0f + 4.0f * lambda));
-
-
-		}
+	int setter;
+	for (int i = 0; i < N; i++) {
+		A.set_element(i, i, (1.0f + 4.0f * lambda));
+		setter = i - 1;
+		if (setter >= 0)
+			A.set_element(setter, i, (-lambda));//richtige coordinate offset?
+		setter = i - T.cols;//richtige coordinate offset?
+		if (setter >= 0)
+			A.set_element(setter, i, (-lambda));
+		setter = i + 1;
+		if (setter < N)
+			A.set_element(setter, i, (-lambda));
+		setter = i + T.cols;
+		if (setter < N)
+			A.set_element(setter, i, (-lambda));
 	}
 
 	/*
@@ -366,6 +382,11 @@ void DiffusionSimulator::updateDimensions(int m, int n)
 	this->pixels = GridPixel::initPixelsFromGrid(&T); // TODO Check if this is ok
 }
 
+void TW_CALL DiffusionSimulator::ApplyResize(void*)
+{
+	updateDimensions(newRowSize, newColumSize);
+}
+
 void DiffusionSimulator::updatePixels()
 {
 	for each (auto pixel in pixels) pixel->update();
@@ -397,6 +418,10 @@ void DiffusionSimulator::simulateTimestep(float timeStep)
 	}
 
 	updatePixels();
+
+	if (T.rows != newRowSize || T.cols != newColumSize) {
+		updateDimensions(newRowSize, newColumSize);
+	}
 }
 
 void DiffusionSimulator::drawObjects()
