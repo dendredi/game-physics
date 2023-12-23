@@ -11,8 +11,8 @@ using namespace std;
 void GridPixel::update() {
 	Real value = grid->get(x, y);
 
-	Real scaleX = 1.0 / grid->cols;
-	Real scaleY = 1.0 / grid->rows;
+	Real scaleX = 1.0 / INIT_N;
+	Real scaleY = 1.0 / INIT_M;
 
 	Real normalizedValue = (value - normInterval.first) / (normInterval.second - normInterval.first);
 
@@ -288,20 +288,49 @@ void DiffusionSimulator::diffuseTemperatureImplicit(float timeStep) {
 
 	int setter;
 	for (int i = 0; i < N; i++) {
-		A.set_element(i, i, (1.0f + 4.0f * lambda));
-		setter = i - 1;
+
+		int j = i % T.cols;
+		//int k = (i - j) / T.cols;
+		//std::cout << j << "|" << k << std::endl;
+
+		A.set_element(i, i, (1.0f + 4.0f * lambda)); // 2 2
+
+		if (i != 0 && j != 0) {
+			A.set_element(i, i - 1, (-lambda));	// 2 1
+		}
+
+		if (i != N - 1 && j != N - 1) {
+			A.set_element(i, i + 1, (-lambda)); // 2 3
+		}
+
+		setter = i - T.cols;
+		if (setter >= 0) {
+			A.set_element(i, setter, (-lambda)); // 1 2
+		}
+
+		setter = i + T.cols; 
+		if (setter < N) {
+			A.set_element(i, setter, (-lambda)); // 3 2
+		}
+
+		/*
+		setter = i - 1; //1
 		if (setter >= 0)
-			A.set_element(setter, i, (-lambda));//richtige coordinate offset?
-		setter = i - T.cols;//richtige coordinate offset?
-		if (setter >= 0)
-			A.set_element(setter, i, (-lambda));
-		setter = i + 1;
+			A.set_element(setter, i, (-lambda));//richtige coordinate offset? // 1 2
+		setter = i - T.cols;//richtige coordinate offset? // 2 - m ?? - value
+		if (setter >= 0) // no
+			A.set_element(setter, i, (-lambda));      // no
+		setter = i + 1; // 3
 		if (setter < N)
 			A.set_element(setter, i, (-lambda));
 		setter = i + T.cols;
 		if (setter < N)
 			A.set_element(setter, i, (-lambda));
+			*/
 	}
+
+	//A.set_element(0, 0, 1.0f);
+	//A.set_element(N - 1, N - 1, 1.0f);
 
 	/*
 	assemble the right - hand side b
@@ -327,6 +356,16 @@ void DiffusionSimulator::diffuseTemperatureImplicit(float timeStep) {
 
 
 	T.update_from_vector(x);
+
+	// null for boundary
+	for (int i = 0; i < T.rows; i++) {
+		T.set(i, 0, 0.0f);
+		T.set(i, T.cols - 1, 0.0f);
+	}
+	for (int j = 0; j < T.cols; j++) {
+		T.set(0, j, 0.0f);
+		T.set(T.rows - 1, j, 0.0f);
+	}
 }
 
 void diffuseTemperatureImplicit_TEMPLATE(float timeStep) {
