@@ -181,6 +181,9 @@ DiffusionSimulator::DiffusionSimulator()
 	std::cout << "Window:" << endl << window.to_string();
 	std::cout << "Result:" << endl << result.to_string();
 	*/
+
+	alpha = ALPHA;
+
 }
 
 const char * DiffusionSimulator::getTestCasesStr(){
@@ -208,6 +211,9 @@ void DiffusionSimulator::initUI(DrawingUtilitiesClass * DUC)
 
 	TwAddVarRW(DUC->g_pTweakBar, "m", TW_TYPE_INT32, &newColumSize, "min=10 max=100");
 	TwAddVarRW(DUC->g_pTweakBar, "n", TW_TYPE_INT32, &newRowSize, "min=10 max=100");
+	TwAddButton(DUC->g_pTweakBar, "set alpha to 3000 for unstable test", NULL, NULL, "");
+	TwAddVarRW(DUC->g_pTweakBar, "alpha", TW_TYPE_INT32, &alpha, "min=5 max=5000");
+
 
 }
 
@@ -226,6 +232,7 @@ void DiffusionSimulator::notifyCaseChanged(int testCase)
 		break;
 	case 1:
 		cout << "Implicit solver!\n";
+		//alpha = 300;
 		break;
 	default:
 		cout << "Empty Test!\n";
@@ -244,7 +251,7 @@ void DiffusionSimulator::diffuseTemperatureExplicit(float timeStep) {
 			}
 			else {
 				Real currentValue = T.get(i, j);
-				Real time_derivative_ij = ALPHA * laplace.get(i - 1, j - 1);
+				Real time_derivative_ij = alpha * laplace.get(i - 1, j - 1);
 				Real newValue = currentValue + time_derivative_ij * timeStep;
 				T.set(i, j, newValue);
 			}
@@ -261,7 +268,7 @@ void DiffusionSimulator::diffuseTemperatureImplicit(float timeStep) {
 	SparseMatrix<Real> A(N);
 	std::vector<Real> b(N);
 
-	Real lambda = ALPHA * timeStep; 
+	Real lambda = alpha * timeStep; 
 
 	/*
 	assemble the system matrix A 

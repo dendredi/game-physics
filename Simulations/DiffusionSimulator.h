@@ -77,6 +77,7 @@ public:
 	void callbackSetM(const void* value, void* clientData);
 	void callbackSetN(const void* value, void* clientData);
 
+	int alpha = 15;
 
 private:
 	// Attributes
@@ -92,6 +93,8 @@ private:
 
 	int newColumSize = 32;
 	int newRowSize = 32;
+
+	
 
 	std::vector<GridPixel*> pixels;
 	void updatePixels();
