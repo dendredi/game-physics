@@ -199,7 +199,7 @@ void DiffusionSimulator::handleCollisions()
 
 void DiffusionSimulator::handleOneCollision(int indexA, int indexB)
 {
-	/*
+	
 	RigidBody* A = rigidBodies[indexA];
 	RigidBody* B = rigidBodies[indexB];
 
@@ -238,7 +238,7 @@ void DiffusionSimulator::handleOneCollision(int indexA, int indexB)
 	A->angularMomentum_L += cross(x_a, Jn);
 	B->angularMomentum_L -= cross(x_b, Jn);
 
-	*/
+	
 }
 
 void DiffusionSimulator::onClick(int x, int y)
