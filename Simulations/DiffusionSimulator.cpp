@@ -8,6 +8,277 @@ using namespace std;
 #define ALPHA 15
 #define INIT_HIGH_TEMP 10
 
+// --- Rigid body ---
+
+ExternalForce::ExternalForce(Vec3 force, Vec3 position) {
+	this->force = force;
+	this->position = position;
+}
+
+Vec3 ExternalForce::convertToTorque(Vec3 centerOfMass) {
+	Vec3 localSpacePos = position - centerOfMass;
+	return cross(localSpacePos, force);
+}
+
+
+RigidBody::RigidBody(Vec3 position_x, Quat orientation_r, Vec3 size, float mass_m) {
+	this->position_x = position_x;
+	this->size = size;
+	this->orientation_r = orientation_r;
+	this->mass_m = mass_m;
+
+	this->initInverse_I_0();
+}
+
+// TODO: Check if Mat3 instead of Mat4 is necessary/possible!
+void RigidBody::initInverse_I_0() {
+	// Specific to rectangles
+
+	float width = size[0];
+	float height = size[1];
+	float depth = size[2];
+
+	float fak = mass_m / 12;
+
+	float I_11 = fak * (std::pow(height, 2) + std::pow(depth, 2));
+	float I_22 = fak * (std::pow(width, 2) + std::pow(height, 2));
+	float I_33 = fak * (std::pow(width, 2) + std::pow(depth, 2));
+
+	double arr[16] = { I_11, 0, 0, 0, 0, I_22, 0, 0, 0, 0, I_33, 0, 0, 0, 0, 1 };
+
+	Inverse_I_0 = Mat4();
+	Inverse_I_0.initFromArray(arr);
+	Inverse_I_0 = Inverse_I_0.inverse();
+}
+
+Mat4 RigidBody::getInverseInertiaTensorRotated() {
+	auto rotMat = orientation_r.getRotMat();
+	auto rotMat_T = orientation_r.getRotMat();
+	rotMat_T.transpose();
+	return rotMat * Inverse_I_0 * rotMat_T;
+}
+
+Mat4 RigidBody::getObject2WorldMatrix() {
+	Mat4 scaleMat = Mat4();
+	scaleMat.initScaling(size.x, size.y, size.z);
+
+	Mat4 translatMat = Mat4();
+	translatMat.initTranslation(position_x.x, position_x.y, position_x.z);
+
+	return scaleMat * orientation_r.getRotMat() * translatMat; // scaleMat * rotMat * translatMat;
+}
+
+// 0 at last position!!
+Quat RigidBody::getAngularVelocityQuat()
+{
+	return Quat(angularVelocity_w.x, angularVelocity_w.y, angularVelocity_w.z, 0);
+}
+
+void RigidBody::applyExternalForce(ExternalForce* force)
+{
+	externalForces.push_back(force);
+}
+
+Vec3 RigidBody::sumTotalForce_F()
+{
+	Vec3 out;
+	for each (auto eForce in externalForces) {
+		out += eForce->force;
+	}
+
+	return out;
+}
+
+Vec3 RigidBody::sumTotalTorque_q()
+{
+	Vec3 out;
+	for each (auto eForce in externalForces) {
+		out += eForce->convertToTorque(position_x);
+	}
+
+	return out;
+}
+
+Vec3 RigidBody::localToWoldPosition(Vec3 localPosition)
+{
+	return position_x + orientation_r.getRotMat().transformVector(localPosition);
+}
+
+Vec3 RigidBody::getTotalVelocityAtLocalPositiion(Vec3 localPosition)
+{
+	return linearVelocity_v + cross(angularVelocity_w, localPosition);
+}
+
+void RigidBody::printState()
+{
+	// linearVelocity_v; angularVelocity_w; angularMomentum_L;
+	std::cout << "position x: " << position_x << endl;
+	std::cout << "v: " << linearVelocity_v << endl;
+	std::cout << "r: " << orientation_r << endl;
+	std::cout << "L: " << angularMomentum_L << endl;
+	std::cout << "w: " << angularVelocity_w << "; InvI (rot):";
+	std::cout << "InvI(rot) :";
+	std::cout << getInverseInertiaTensorRotated() << endl;
+}
+
+Vec3 DiffusionSimulator::getPositionOfRigidBody(int i) {
+	return rigidBodies[i]->position_x;
+}
+
+void DiffusionSimulator::applyForceOnBody(int i, Vec3 loc, Vec3 force) {
+	rigidBodies[i]->applyExternalForce(new ExternalForce(force, loc));
+}
+
+void DiffusionSimulator::initSetup_RB() {
+	rigidBodies.clear();
+
+	Vec3 position = Vec3(-1, 1, 0);
+	Vec3 size = Vec3(.1, 0.1, 0.1);
+
+	Mat4 rotMat = Mat4();
+	rotMat.initRotationZ(90);
+
+	RigidBody* rect = new RigidBody(position, Quat(rotMat), size, 2);
+
+	Vec3 force_dir = Vec3(.5, -1, 0) * 2;
+
+	// Initial velocity
+	rect->linearVelocity_v = force_dir;
+
+	ExternalForce* force = new ExternalForce(force_dir, Vec3(-1.1, 1, 0));
+	rect->applyExternalForce(force);
+
+	rigidBodies.push_back(rect);
+}
+
+Quat normalzeQuat(Quat quaternion) {
+	auto norm = quaternion.norm();
+	if (norm > 0) {
+		quaternion /= norm;
+	}
+	return quaternion;
+}
+
+void DiffusionSimulator::simulateTimestep_RB(float timeStep)
+{
+	for each (auto body in rigidBodies) {
+
+		/* Linear Part */
+
+		// Integrate positon of x_cm (linear translation)
+		body->position_x += timeStep * body->linearVelocity_v;
+		// Integrate velocity of x_cm
+		Vec3 acceleration = body->sumTotalForce_F() / body->mass_m;
+		body->linearVelocity_v += timeStep * acceleration;
+
+		/* Angular Part */
+
+		// Integrate Orientation r
+		Quat wr = body->getAngularVelocityQuat() * body->orientation_r;
+		body->orientation_r += timeStep / 2 * wr; // TODO: Verify
+		body->orientation_r = normalzeQuat(body->orientation_r);
+
+		// Integrate Angular Momentum L
+		body->angularMomentum_L += body->sumTotalTorque_q() * timeStep;
+
+		// Update angular velocity using I and L
+		body->angularVelocity_w = body->getInverseInertiaTensorRotated().transformVector(body->angularMomentum_L);
+	}
+}
+
+void DiffusionSimulator::handleCollisions()
+{
+	for (int i = 0; i < rigidBodies.size(); i++) {
+		for (int j = 0; j < i; j++) {
+			handleOneCollision(i, j);
+		}
+	}
+}
+
+
+
+void DiffusionSimulator::handleOneCollision(int indexA, int indexB)
+{
+	/*
+	RigidBody* A = rigidBodies[indexA];
+	RigidBody* B = rigidBodies[indexB];
+
+	auto info = checkCollisionSAT(A->getObject2WorldMatrix(), B->getObject2WorldMatrix());
+	if (!info.isValid) return;
+
+	float c = 0.1;
+	const Vec3 n = info.normalWorld; // From B to A
+
+	Vec3 x_a = info.collisionPointWorld - A->position_x;
+	Vec3 x_b = info.collisionPointWorld - B->position_x;
+
+	Vec3 v_rel = A->getTotalVelocityAtLocalPositiion(x_a) - B->getTotalVelocityAtLocalPositiion(x_b);
+
+	auto v_rel_dot_n = dot(v_rel, n);
+
+	if (v_rel_dot_n > 0) {
+		// Bodies are already separating
+		return;
+	}
+
+	// Further compute formula
+	Vec3 intermediate = cross(A->getInverseInertiaTensorRotated().transformVector(cross(x_a, n)), x_a) +
+		cross(B->getInverseInertiaTensorRotated().transformVector(cross(x_b, n)), x_b);
+	auto J = (-(1 + c) * v_rel_dot_n) / ((1 / A->mass_m) + (1 / B->mass_m) + dot(intermediate, n));
+	
+	// Update
+
+	Vec3 Jn = J * n;
+
+	// Linear
+	A->linearVelocity_v += Jn / A->mass_m;
+	B->linearVelocity_v -= Jn / B->mass_m;
+
+	// Angular
+	A->angularMomentum_L += cross(x_a, Jn);
+	B->angularMomentum_L -= cross(x_b, Jn);
+
+	*/
+}
+
+void DiffusionSimulator::onClick(int x, int y)
+{
+	m_trackmouse.x = x;
+	m_trackmouse.y = y;
+
+	if (!chargingForce) {
+		chargingForce = true;
+	}
+}
+
+void DiffusionSimulator::onMouse(int x, int y)
+{
+	if (chargingForce) {
+		chargingForce = false;
+		// calculate
+		Point2D mouseDiff;
+		mouseDiff.x = m_trackmouse.x - m_oldtrackmouse.x;
+		mouseDiff.y = m_trackmouse.y - m_oldtrackmouse.y;
+		if (mouseDiff.x != 0 || mouseDiff.y != 0)
+		{
+			Mat4 worldViewInv = Mat4(DUC->g_camera.GetWorldMatrix() * DUC->g_camera.GetViewMatrix());
+			worldViewInv = worldViewInv.inverse();
+			Vec3 inputView = Vec3((float)mouseDiff.x, (float)-mouseDiff.y, 0);
+			Vec3 inputWorld = worldViewInv.transformVectorNormal(inputView);
+			std::cout << inputWorld << std::endl;
+			 
+			applyForceOnBody(0, getPositionOfRigidBody(0), inputWorld * -0.01); // TODO
+		}
+	}
+
+	m_oldtrackmouse.x = x;
+	m_oldtrackmouse.y = y;
+	m_trackmouse.x = x;
+	m_trackmouse.y = y;
+}
+
+// --- PDE ---
+
 void GridPixel::update() {
 	Real value = grid->get(x, y);
 
@@ -209,6 +480,7 @@ void DiffusionSimulator::initUI(DrawingUtilitiesClass * DUC)
 	// TODO
 	//TwAddVarCB(DUC->g_pTweakBar, "m", TW_TYPE_INT32, callbackSetM, NULL, NULL, "min=10 max=100");
 
+	initSetup_RB();
 }
 
 void DiffusionSimulator::notifyCaseChanged(int testCase)
@@ -365,6 +637,11 @@ void DiffusionSimulator::updatePixels()
 
 void DiffusionSimulator::simulateTimestep(float timeStep)
 {
+	simulateTimestep_PDE(timeStep);
+	simulateTimestep_RB(timeStep);
+}
+
+void DiffusionSimulator::simulateTimestep_PDE(float timeStep) {
 	// update current setup for each frame
 	switch (m_iTestCase)
 	{
@@ -379,7 +656,8 @@ void DiffusionSimulator::simulateTimestep(float timeStep)
 	updatePixels();
 }
 
-void DiffusionSimulator::drawObjects()
+
+void DiffusionSimulator::drawObjects_PDE()
 {
 	for each (auto pixel in pixels)
 	{
@@ -387,22 +665,35 @@ void DiffusionSimulator::drawObjects()
 	}
 }
 
+void DiffusionSimulator::drawObjects_RB() {
+	for (int i = 0; i < rigidBodies.size(); ++i) {
+		auto body = rigidBodies.at(i);
+		DUC->setUpLighting(Vec3(0, 0, 0), 0.4 * Vec3(1, 1, 1), 2000.0, Vec3(0.5, 0.5, 0.5));
+		DUC->drawRigidBody(body->getObject2WorldMatrix());
+
+		for each (auto eForce in body->externalForces) {
+
+			// Draw connection of force point and midpoint
+			DUC->beginLine();
+			DUC->drawLine(body->position_x, Vec3(255, 0, 0), eForce->position, Vec3(255, 0, 0));
+			DUC->endLine();
+
+			// Draw arrow of force
+
+			DUC->beginLine();
+			auto pointTo = eForce->position;
+			auto pointFrom = pointTo - eForce->force;
+			DUC->drawLine(pointFrom, Vec3(255, 255, 255), pointTo, Vec3(255, 255, 255));
+			DUC->endLine();
+
+			DUC->drawSphere(pointTo, Vec3(.02, .02, .02));
+		}
+	}
+}
+
 
 void DiffusionSimulator::drawFrame(ID3D11DeviceContext* pd3dImmediateContext)
 {
-	drawObjects();
-}
-
-void DiffusionSimulator::onClick(int x, int y)
-{
-	m_trackmouse.x = x;
-	m_trackmouse.y = y;
-}
-
-void DiffusionSimulator::onMouse(int x, int y)
-{
-	m_oldtrackmouse.x = x;
-	m_oldtrackmouse.y = y;
-	m_trackmouse.x = x;
-	m_trackmouse.y = y;
+	drawObjects_PDE();
+	drawObjects_RB();
 }
