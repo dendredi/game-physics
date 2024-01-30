@@ -27,6 +27,8 @@ public:
 
 	float mass_m;
 
+	float temperature;
+
 	Vec3 linearVelocity_v;
 	Vec3 angularVelocity_w;
 	Vec3 angularMomentum_L;
@@ -129,6 +131,8 @@ public:
 	// --- Rigid Bodies ---
 	void initSetup_RB();
 	std::vector<RigidBody*> rigidBodies;
+	RigidBody* duringCreationRigidBody = nullptr;
+
 	void drawObjects_RB();
 	Vec3 getPositionOfRigidBody(int i);
 	void applyForceOnBody(int i, Vec3 loc, Vec3 force);
