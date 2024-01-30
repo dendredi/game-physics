@@ -2,11 +2,13 @@
 #include "pcgsolver.h"
 using namespace std;
 
-#define INIT_M 32
-#define INIT_N 32
+#define INIT_M 32 // rows
+#define INIT_N 32 // cols
 
 #define ALPHA 15
 #define INIT_HIGH_TEMP 10
+
+#define CULLING_PROJECTION_RADIUS 6
 
 // --- Rigid body ---
 
@@ -161,6 +163,8 @@ Quat normalzeQuat(Quat quaternion) {
 
 void DiffusionSimulator::simulateTimestep_RB(float timeStep)
 {
+	handleCollisions();
+
 	for each (auto body in rigidBodies) {
 
 		/* Linear Part */
@@ -188,13 +192,24 @@ void DiffusionSimulator::simulateTimestep_RB(float timeStep)
 
 void DiffusionSimulator::handleCollisions()
 {
+	// Handle collisions between rigid bodies
 	for (int i = 0; i < rigidBodies.size(); i++) {
 		for (int j = 0; j < i; j++) {
 			handleOneCollision(i, j);
 		}
 	}
-}
 
+	// Handle collision with grid
+	for each (auto rb in rigidBodies) {
+		for each (auto gp in getProjectedPixels(rb->position_x)) {
+			auto info = checkCollisionSAT(rb->getObject2WorldMatrix(), gp->getObject2WorldMatrix());
+			if (info.isValid) {
+				//gp->hit = true; // TODO
+				T.set(gp->x, gp->y, T.get(gp->x, gp->y) + 1);
+			}
+		}
+	}
+}
 
 
 void DiffusionSimulator::handleOneCollision(int indexA, int indexB)
@@ -279,23 +294,30 @@ void DiffusionSimulator::onMouse(int x, int y)
 
 // --- PDE ---
 
+int index(int row, int col, int totalCols) {
+	return row * totalCols + col;
+}
+
 void GridPixel::update() {
 	Real value = grid->get(x, y);
 
 	Real scaleX = 1.0 / grid->cols;
-	Real scaleY = 1.0 / grid->rows;
+	Real scaleZ = 1.0 / grid->rows;
 
 	Real normalizedValue = (value - normInterval.first) / (normInterval.second - normInterval.first);
 
-	Mat4 posMat = Mat4();
-	posMat.initTranslation(
+	// TODO: Think about cleaner way
+	this->pos = Vec3(
 		x * scaleX - 0.5 + (scaleX * 0.5),
 		normalizedValue * 0.5 - 0.5,
-		y * scaleY - 0.5 + (scaleY * 0.5)
+		y * scaleZ - 0.5 + (scaleZ * 0.5)
 	);
 
+	Mat4 posMat = Mat4();
+	posMat.initTranslation(pos.x, pos.y, pos.z);
+
 	Mat4 sizeMat = Mat4();
-	sizeMat.initScaling(scaleX, normalizedValue, scaleY);
+	sizeMat.initScaling(scaleX, normalizedValue, scaleZ);
 
 	object2WorldMatrix = sizeMat * posMat;
 	color = Vec3(normalizedValue, 0, 1.0f - normalizedValue);
@@ -303,7 +325,16 @@ void GridPixel::update() {
 
 void GridPixel::draw(DrawingUtilitiesClass* DUC)
 {
-	DUC->setUpLighting(color, color, 100, color);
+	// TODO: Implement properly
+	if (hit) {
+		auto col = Vec3(0,1,0);
+		DUC->setUpLighting(col, col, 100, col);
+	}
+	else {
+		DUC->setUpLighting(color, color, 100, color);
+	}
+
+	//DUC->setUpLighting(color, color, 100, color);
 	DUC->drawRigidBody(object2WorldMatrix);
 }
 
@@ -322,8 +353,48 @@ std::vector<GridPixel*> GridPixel::initPixelsFromGrid(Grid* grid)
 	return pixels;
 }
 
+Mat4 GridPixel::getObject2WorldMatrix()
+{
+	return this->object2WorldMatrix;
+}
+
 GridPixel::GridPixel(Grid *grid, int x, int y, std::pair<Real, Real> normInterval) : grid(grid), x(x), y(y), normInterval(normInterval) {
 	update();
+}
+
+void DiffusionSimulator::initGridIntervals()
+{
+	GridPixel* first = pixels.at(0);
+	GridPixel* last = pixels.at(pixels.size() - 1);
+
+	grid_minX = first->pos.x;
+	grid_maxX = last->pos.x;
+
+	grid_minZ = first->pos.z;
+	grid_maxZ = last->pos.z;
+}
+
+std::vector<GridPixel*> DiffusionSimulator::getProjectedPixels(Vec3 position)
+{
+	auto out = std::vector<GridPixel*>();
+
+	if (position.x < grid_minX || position.x > grid_maxX || position.z < grid_minZ || position.x > grid_maxZ) {
+		return out;
+	}
+
+	// X -> Row; Z -> Col
+	int index_row = ((position.x - grid_minX) / (grid_maxX - grid_minX)) * T.cols;
+	int index_col = ((position.z - grid_minZ) / (grid_maxZ - grid_minZ)) * T.rows;
+
+	auto delta = CULLING_PROJECTION_RADIUS / 2; // TODO
+
+	for (int i = std::max(0, index_row - delta); i < std::min(T.rows, index_row + delta); ++i) {
+		for (int j = std::max(0, index_col - delta); j < std::min(T.cols, index_col + delta); ++j) {
+			out.push_back(this->pixels.at(index(i, j, T.cols)));
+		}
+	}
+
+	return out;
 }
 
 // --
@@ -341,7 +412,7 @@ Grid::Grid(int numRows, int numCols) : rows(numRows), cols(numCols) {
 Grid::Grid(int numRows, int numCols, Real *initMatrix) : Grid(numRows, numCols) {
 	for (int i = 0; i < numRows; ++i) {
 		for (int j = 0; j < numCols; ++j) {
-			matrix.at(i * cols + j) = initMatrix[i * cols + j];
+			matrix.at(index(i, j, numCols)) = initMatrix[index(i, j, numCols)];
 		}
 	}
 }
@@ -352,11 +423,11 @@ Grid::~Grid() {
 
 // Accessor and mutator functions for the matrix elements
 Real Grid::get(int row, int col) const {
-	return matrix.at(row * cols + col);
+	return matrix.at(index(row, col, cols));
 }
 
 void Grid::set(int row, int col, Real value) {
-	matrix.at(row * cols + col) = value;
+	matrix.at(index(row, col, cols)) = value;
 }
 
 Grid Grid::operator*(const Real scalar) const {
@@ -625,7 +696,9 @@ void DiffusionSimulator::updateDimensions(int m, int n)
 		}
 	}
 	
-	this->pixels = GridPixel::initPixelsFromGrid(&T); // TODO Check if this is ok
+	this->pixels = GridPixel::initPixelsFromGrid(&T);
+
+	initGridIntervals();
 }
 
 void DiffusionSimulator::updatePixels()

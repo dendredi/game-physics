@@ -58,8 +58,8 @@ class Grid {
 private:
 	std::vector<Real> matrix;
 public:
-	int rows; // y
-	int cols; // x
+	int rows;
+	int cols;
 
 	Grid();
 	Grid(int numRows, int numCols);
@@ -87,20 +87,26 @@ public:
 class GridPixel {
 private:
 	Grid *grid;
-	int x, y;
 	std::pair<Real, Real> normInterval;
 	Mat4 object2WorldMatrix;
 	Vec3 color;
 
 public:
+	int x, y;
+
 	GridPixel(Grid* grid, int x, int y, std::pair<Real, Real> normInterval);
 	void update();
 	void draw(DrawingUtilitiesClass *DUC);
 
 	static std::vector<GridPixel*> initPixelsFromGrid(Grid* grid);
+	Mat4 getObject2WorldMatrix();
+
+	// TODO: Remove
+	bool hit = false;
+	Vec3 pos; // TODO: Think about cleaner way
 };
 
-class DiffusionSimulator:public Simulator{
+class DiffusionSimulator:public Simulator {
 public:
 	// Construtors
 	DiffusionSimulator();
@@ -150,14 +156,24 @@ private:
 	Point2D m_oldtrackmouse;
 	Grid T;
 
+	Real grid_minX;
+	Real grid_maxX;
+
+	Real grid_minZ;
+	Real grid_maxZ;
+
+	void initGridIntervals();
+
 	int newColumSize = 32;
 	int newRowSize = 32;
 
 	float alpha;
 	
+	std::vector<GridPixel*> getProjectedPixels(Vec3 position);
 
 	std::vector<GridPixel*> pixels;
 	void updatePixels();
+
 };
 
 
