@@ -201,11 +201,18 @@ void DiffusionSimulator::handleCollisions()
 
 	// Handle collision with grid
 	for each (auto rb in rigidBodies) {
+		if (rb->gridHit) {
+			continue;
+		}
+
 		for each (auto gp in getProjectedPixels(rb->position_x)) {
 			auto info = checkCollisionSAT(rb->getObject2WorldMatrix(), gp->getObject2WorldMatrix());
 			if (info.isValid) {
-				//gp->hit = true; // TODO
-				T.set(gp->x, gp->y, T.get(gp->x, gp->y) + 1);
+				rb->gridHit = true;
+				gp->hit = true; // TODO
+
+				//T.set(gp->x, gp->y, T.get(gp->x, gp->y) + 1);
+				T.set(gp->x, gp->y, INIT_HIGH_TEMP);
 			}
 		}
 	}

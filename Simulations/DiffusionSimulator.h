@@ -48,6 +48,8 @@ public:
 
 	void printState();
 
+	bool gridHit = false;
+
 private:
 	void initInverse_I_0();
 };
