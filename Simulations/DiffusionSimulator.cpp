@@ -267,9 +267,51 @@ void DiffusionSimulator::onClick(int x, int y)
 {
 	m_trackmouse.x = x;
 	m_trackmouse.y = y;
+	
 
 	if (!chargingForce) {
 		chargingForce = true;
+
+		if (duringCreationRigidBody == nullptr) {
+			// get coords in worldspace from screen space coord :O
+			Mat4 worldViewInv = Mat4(DUC->g_camera.GetWorldMatrix() * DUC->g_camera.GetViewMatrix());
+			worldViewInv = worldViewInv.inverse();
+			
+			// Todo get actual screen width and height
+			/*
+			RECT rect;
+			if (GetWindowRect(hwnd, &rect))
+			{
+				int width = rect.right - rect.left;
+				int height = rect.bottom - rect.top;
+			}*/
+
+			Vec3 position = Vec3(x, y, 0);
+			// Vec3 halfScreen = Vec3(width/2, height/2, 1);
+			Vec3 halfScreen = Vec3(630, 320, 1);
+
+			Vec3 homoneneousPosition = (position - halfScreen) / halfScreen;
+			// so sry about magic numbers, but that's what these are ... :D
+			//homoneneousPosition.z = 2;
+			//homoneneousPosition.y = -0.8 * homoneneousPosition.y;
+			//homoneneousPosition.x = 1.65 * homoneneousPosition.x;
+			homoneneousPosition.z = 1.5;
+			homoneneousPosition.y = -0.4 * homoneneousPosition.z * homoneneousPosition.y;
+			homoneneousPosition.x = 0.77 * homoneneousPosition.z * homoneneousPosition.x;
+
+			std::cout << "position : " << position << "; homoneneous position: " << homoneneousPosition << std::endl;
+
+			Vec3 worldPosition = worldViewInv.transformVector(homoneneousPosition);
+			
+
+			Mat4 rotation = Mat4();
+
+			duringCreationRigidBody = new RigidBody(worldPosition, Quat(rotation), Vec3(0.1, 0.1, 0.1), 0.1f);
+			std::cout << "world position: " << duringCreationRigidBody->position_x << std::endl;
+		}
+		else if (duringCreationRigidBody != nullptr) {
+			// Todo change speed preview and tempereateur witch happens to be same thing xD
+		}
 	}
 }
 
@@ -277,6 +319,11 @@ void DiffusionSimulator::onMouse(int x, int y)
 {
 	if (chargingForce) {
 		chargingForce = false;
+
+		// a new rigid bodie is born
+		int id = rigidBodies.size();
+		rigidBodies.push_back(duringCreationRigidBody);
+
 		// calculate
 		Point2D mouseDiff;
 		mouseDiff.x = m_trackmouse.x - m_oldtrackmouse.x;
@@ -287,10 +334,13 @@ void DiffusionSimulator::onMouse(int x, int y)
 			worldViewInv = worldViewInv.inverse();
 			Vec3 inputView = Vec3((float)mouseDiff.x, (float)-mouseDiff.y, 0);
 			Vec3 inputWorld = worldViewInv.transformVectorNormal(inputView);
-			std::cout << inputWorld << std::endl;
+			//std::cout << "Force Vec in world coords: " << inputWorld << std::endl;
 			 
-			applyForceOnBody(0, getPositionOfRigidBody(0), inputWorld * -0.01); // TODO
+			applyForceOnBody(id, getPositionOfRigidBody(id), inputWorld * -0.01);
+			// Todo this Force seems to just keep existing, it should'nt?
 		}
+
+		duringCreationRigidBody = nullptr;
 	}
 
 	m_oldtrackmouse.x = x;
@@ -768,6 +818,13 @@ void DiffusionSimulator::drawObjects_RB() {
 
 			DUC->drawSphere(pointTo, Vec3(.02, .02, .02));
 		}
+	}
+
+	if (duringCreationRigidBody != nullptr) {
+		auto body = duringCreationRigidBody;
+		// Todo get Color from Temperature
+		DUC->setUpLighting(Vec3(0, 0, 0), 0.4 * Vec3(1, 1, 1), 2000.0, Vec3(0.5, 0.5, 0.5));
+		DUC->drawRigidBody(body->getObject2WorldMatrix());
 	}
 }
 
