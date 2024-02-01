@@ -27,8 +27,6 @@ public:
 
 	float mass_m;
 
-	float temperature;
-
 	Vec3 linearVelocity_v;
 	Vec3 angularVelocity_w;
 	Vec3 angularMomentum_L;

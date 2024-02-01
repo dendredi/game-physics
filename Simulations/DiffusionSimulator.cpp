@@ -941,13 +941,11 @@ void DiffusionSimulator::drawObjects_PDE()
 }
 
 void DiffusionSimulator::drawObjects_RB() {
-	auto normInterval = T.getValueInterval();
+	Vec3 rbColor = Vec3(1, 0, 0);
+
 	for (int i = 0; i < rigidBodies.size(); ++i) {
 		auto body = rigidBodies.at(i);
-		//DUC->setUpLighting(Vec3(0, 0, 0), 0.4 * Vec3(1, 1, 1), 2000.0, Vec3(0.5, 0.5, 0.5));
-		Real normalizedValue = (body->temperature - normInterval.first) / (normInterval.second - normInterval.first);
-		auto temp_col = Vec3(normalizedValue, 0, 1.0f - normalizedValue);
-		DUC->setUpLighting(temp_col, temp_col, 2000.0, temp_col);
+		DUC->setUpLighting(Vec3(0.5, 0.5, 0.5), Vec3(0.7, 0.75, 0.9), 10, Vec3(1, 1, 1));
 		DUC->drawRigidBody(body->getObject2WorldMatrix());
 
 		for each (auto eForce in body->externalForces) {
@@ -972,9 +970,7 @@ void DiffusionSimulator::drawObjects_RB() {
 	if (duringCreationRigidBody != nullptr) {
 		auto body = duringCreationRigidBody;
 		// get Color from Temperature
-		Real normalizedValue = (body->temperature - normInterval.first) / (normInterval.second - normInterval.first);
-		auto temp_col = Vec3(normalizedValue, 0, 1.0f - normalizedValue);
-		DUC->setUpLighting(temp_col, temp_col, 2000.0, temp_col);
+		DUC->setUpLighting(Vec3(0.5, 0.5, 0.5), Vec3(0.7, 0.75, 0.9), 10, Vec3(1, 1, 1));
 		DUC->drawRigidBody(body->getObject2WorldMatrix());
 	}
 }
