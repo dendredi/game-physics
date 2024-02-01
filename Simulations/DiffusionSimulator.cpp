@@ -9,6 +9,7 @@ using namespace std;
 #define WAVE_SPEED 300
 #define CULLING_PROJECTION_RADIUS 6
 #define WATER_ZERO_HEIGHT -0.5
+#define DAMPING 0.999
 
 // TODO: Remove 
 #define ALPHA 15
@@ -606,6 +607,7 @@ void DiffusionSimulator::diffuseTemperatureExplicit(float timeStep) {
 	for (int i = 1; i < T.rows - 1; ++i) {
 		for (int j = 1; j < T.cols - 1; ++j) {
 			Real u_ij_new = WAVE_SPEED * WAVE_SPEED * timeStep * timeStep * laplace.get(i - 1, j - 1) + 2 * T.get(i, j) - T_t_minus_one.get(i, j);
+			u_ij_new *= DAMPING;
 
 			T_t_minus_one.set(i, j, T.get(i, j));
 			T.set(i, j, u_ij_new);
