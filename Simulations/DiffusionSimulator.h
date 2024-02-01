@@ -50,6 +50,8 @@ public:
 
 	void printState();
 
+	bool gridHit = false;
+
 private:
 	void initInverse_I_0();
 };
@@ -72,7 +74,6 @@ public:
 	Real get(int row, int col) const;
 	void set(int row, int col, Real value);
 
-	// Overloading the + operator
 	Grid operator*(const Real scalar) const;
 
 	// Min and max values
@@ -103,8 +104,6 @@ public:
 	static std::vector<GridPixel*> initPixelsFromGrid(Grid* grid);
 	Mat4 getObject2WorldMatrix();
 
-	// TODO: Remove
-	bool hit = false;
 	Vec3 pos; // TODO: Think about cleaner way
 };
 
@@ -159,6 +158,10 @@ private:
 	Point2D m_trackmouse;
 	Point2D m_oldtrackmouse;
 	Grid T;
+
+	// Needed for wave equation
+	Grid T_t_minus_one;
+	Grid spatial_convolution_window;
 
 	Real grid_minX;
 	Real grid_maxX;
