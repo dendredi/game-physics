@@ -151,6 +151,13 @@ void DiffusionSimulator::initSetup_RB() {
 	rect->applyExternalForce(force);
 
 	rigidBodies.push_back(rect);
+
+
+	// test wall
+	
+	// RigidBody* wall = new RigidBody(Vec3(1, 0, 0), Quat(rotMat), Vec3(2, 0.5, 2), 100000);
+	// rigidBodies.push_back(wall);
+
 }
 
 Quat normalzeQuat(Quat quaternion) {
@@ -209,6 +216,60 @@ void DiffusionSimulator::handleCollisions()
 			}
 		}
 	}
+
+	//Handle collision with wall
+	/*
+	for each (auto rb in rigidBodies) {
+		Mat4 scalingMatrix = Mat4();
+		scalingMatrix.initScaling(1000, 2, 2);
+		Mat4 translationMatrix = Mat4();
+		translationMatrix.initTranslation(501, 0, 0);
+		auto info = checkCollisionSAT(rb->getObject2WorldMatrix(), scalingMatrix * translationMatrix);
+		if (info.isValid) {
+
+			rb->externalForces.clear();
+
+			std::cout << "WALL" << std::endl;
+
+			float c = 0.1;
+			const Vec3 n = info.normalWorld; // From B to A
+
+			Vec3 x_a = info.collisionPointWorld - rb->position_x;
+			Vec3 x_b = info.collisionPointWorld - 1;
+
+			Vec3 v_rel = rb->getTotalVelocityAtLocalPositiion(x_a);
+
+			auto v_rel_dot_n = dot(v_rel, n);
+
+			if (v_rel_dot_n > 0) {
+				// Bodies are already separating
+				return;
+			}
+
+			Mat4 bigMassFakeInertiaTensor = Mat4();
+			double arr[16] = { 1000000, 0, 0, 0, 0, 1000, 0, 0, 0, 0, 1000, 0, 0, 0, 0, 1 };
+			bigMassFakeInertiaTensor.initFromArray(arr);
+
+			// Further compute formula
+			Vec3 intermediate = cross(rb->getInverseInertiaTensorRotated().transformVector(cross(x_a, n)), x_a) +
+				cross(bigMassFakeInertiaTensor.transformVector(cross(x_b, n)), x_b);
+			auto J = (-(1 + c) * v_rel_dot_n) / ((1 / rb->mass_m) + (1 / 12000) + dot(intermediate, n));
+
+			// Update
+
+			Vec3 Jn = J * n;
+
+			// Linear
+			rb->linearVelocity_v += Jn / rb->mass_m;
+
+			// Angular
+			rb->angularMomentum_L += cross(x_a, Jn);
+
+			
+		}
+	}
+	*/
+
 }
 
 
@@ -220,6 +281,11 @@ void DiffusionSimulator::handleOneCollision(int indexA, int indexB)
 
 	auto info = checkCollisionSAT(A->getObject2WorldMatrix(), B->getObject2WorldMatrix());
 	if (!info.isValid) return;
+
+	//todo is this right is this wrong who am i to disagree
+	A->externalForces.clear();
+	B->externalForces.clear();
+
 
 	float c = 0.1;
 	const Vec3 n = info.normalWorld; // From B to A
@@ -269,7 +335,7 @@ void DiffusionSimulator::onClick(int x, int y)
 			// get coords in worldspace from screen space coord :O
 			Mat4 worldViewInv = Mat4(DUC->g_camera.GetWorldMatrix() * DUC->g_camera.GetViewMatrix());
 			worldViewInv = worldViewInv.inverse();
-			
+
 			// Todo get actual screen width and height
 			/*
 			RECT rect;
@@ -288,24 +354,59 @@ void DiffusionSimulator::onClick(int x, int y)
 			//homoneneousPosition.z = 2;
 			//homoneneousPosition.y = -0.8 * homoneneousPosition.y;
 			//homoneneousPosition.x = 1.65 * homoneneousPosition.x;
-			homoneneousPosition.z = 1.5;
+			homoneneousPosition.z = 2;
 			homoneneousPosition.y = -0.4 * homoneneousPosition.z * homoneneousPosition.y;
 			homoneneousPosition.x = 0.77 * homoneneousPosition.z * homoneneousPosition.x;
 
 			std::cout << "position : " << position << "; homoneneous position: " << homoneneousPosition << std::endl;
 
 			Vec3 worldPosition = worldViewInv.transformVector(homoneneousPosition);
-			
+
 
 			Mat4 rotation = Mat4();
 
 			duringCreationRigidBody = new RigidBody(worldPosition, Quat(rotation), Vec3(0.1, 0.1, 0.1), 0.1f);
 			std::cout << "world position: " << duringCreationRigidBody->position_x << std::endl;
 		}
-		else if (duringCreationRigidBody != nullptr) {
-			// Todo change speed preview and tempereateur witch happens to be same thing xD
-		}
 	}
+		if (chargingForce && duringCreationRigidBody != nullptr) {
+			// Todo change speed preview and tempereateur witch happens to be same thing xD
+			
+			// calculate
+			Point2D mouseDiff;
+			mouseDiff.x = m_trackmouse.x - m_oldtrackmouse.x;
+			mouseDiff.y = m_trackmouse.y - m_oldtrackmouse.y;
+			if (mouseDiff.x != 0 || mouseDiff.y != 0)
+			{
+				Mat4 worldViewInv = Mat4(DUC->g_camera.GetWorldMatrix() * DUC->g_camera.GetViewMatrix());
+				worldViewInv = worldViewInv.inverse();
+				Vec3 inputView = Vec3((float)mouseDiff.x, (float)-mouseDiff.y, 0);
+				Vec3 inputWorld = worldViewInv.transformVectorNormal(inputView);
+
+				std::cout << "changing rotation from " << duringCreationRigidBody->orientation_r << "to ";
+
+				//Quat change = Quat(inputWorld.x, inputWorld.y, inputWorld.z);
+				// std::cout << inputWorld << ", its now ";
+				//duringCreationRigidBody->orientation_r = change;
+
+
+				Vec3 up = Vec3(0, 1, 0);
+				//inputWorld = -1 * inputWorld;
+				Quat q;
+				Vec3 a = cross(up, inputWorld);// crossproduct(v1, v2);
+				//q.xyz = a;
+				q.x = a.x;
+				q.y = a.y;
+				q.z = a.z;
+
+				q.w = sqrt((dot(inputWorld, inputWorld)) * (dot(up,up))) + dot(inputWorld, up);
+				
+
+				duringCreationRigidBody->orientation_r = q.unit();
+
+				std::cout << duringCreationRigidBody->orientation_r << std::endl;
+			}
+		}
 }
 
 void DiffusionSimulator::onMouse(int x, int y)
@@ -789,9 +890,13 @@ void DiffusionSimulator::drawObjects_PDE()
 }
 
 void DiffusionSimulator::drawObjects_RB() {
+	auto normInterval = T.getValueInterval();
 	for (int i = 0; i < rigidBodies.size(); ++i) {
 		auto body = rigidBodies.at(i);
-		DUC->setUpLighting(Vec3(0, 0, 0), 0.4 * Vec3(1, 1, 1), 2000.0, Vec3(0.5, 0.5, 0.5));
+		//DUC->setUpLighting(Vec3(0, 0, 0), 0.4 * Vec3(1, 1, 1), 2000.0, Vec3(0.5, 0.5, 0.5));
+		Real normalizedValue = (body->temperature - normInterval.first) / (normInterval.second - normInterval.first);
+		auto temp_col = Vec3(normalizedValue, 0, 1.0f - normalizedValue);
+		DUC->setUpLighting(temp_col, temp_col, 2000.0, temp_col);
 		DUC->drawRigidBody(body->getObject2WorldMatrix());
 
 		for each (auto eForce in body->externalForces) {
@@ -815,8 +920,10 @@ void DiffusionSimulator::drawObjects_RB() {
 
 	if (duringCreationRigidBody != nullptr) {
 		auto body = duringCreationRigidBody;
-		// Todo get Color from Temperature
-		DUC->setUpLighting(Vec3(0, 0, 0), 0.4 * Vec3(1, 1, 1), 2000.0, Vec3(0.5, 0.5, 0.5));
+		// get Color from Temperature
+		Real normalizedValue = (body->temperature - normInterval.first) / (normInterval.second - normInterval.first);
+		auto temp_col = Vec3(normalizedValue, 0, 1.0f - normalizedValue);
+		DUC->setUpLighting(temp_col, temp_col, 2000.0, temp_col);
 		DUC->drawRigidBody(body->getObject2WorldMatrix());
 	}
 }
