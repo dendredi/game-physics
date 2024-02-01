@@ -234,27 +234,27 @@ void DiffusionSimulator::handleCollisions()
 	//Handle collision with wall
 	for (int i = 0; i < rigidBodies.size(); ++i) {
 		auto rb = rigidBodies.at(i);
-		// wall at 1.5 x (rechts)
-		if ((rb->position_x.x + rb->size.x * 0.5) > 1.5) {
+		// wall at 1 x (rechts)
+		if ((rb->position_x.x + rb->size.x * 0.5) > 1) {
 			if (rb->linearVelocity_v.x > 0) {
 				rb->linearVelocity_v.x = -rb->linearVelocity_v.x;
 			}
 		}
-		// wall at - 1.5 x (links)
-		if ((rb->position_x.x + rb->size.x * 0.5) < -1.5) {
+		// wall at - 1 x (links)
+		if ((rb->position_x.x + rb->size.x * 0.5) < - 1) {
 			if (rb->linearVelocity_v.x < 0) {
 				rb->linearVelocity_v.x = -rb->linearVelocity_v.x;
 			}
 		}
 
-		// wall at 1.5 z
-		if ((rb->position_x.z + rb->size.z * 0.5) > 1.5) {
+		// wall at 1 z
+		if ((rb->position_x.z + rb->size.z * 0.5) > 1) {
 			if (rb->linearVelocity_v.z > 0) {
 				rb->linearVelocity_v.z = -rb->linearVelocity_v.z;
 			}
 		}
-		// wall at - 1.5 z
-		if ((rb->position_x.z + rb->size.z * 0.5) < -1.5) {
+		// wall at - 1 z
+		if ((rb->position_x.z + rb->size.z * 0.5) < -1) {
 			if (rb->linearVelocity_v.z < 0) {
 				rb->linearVelocity_v.z = -rb->linearVelocity_v.z;
 			}
@@ -393,6 +393,11 @@ void DiffusionSimulator::onClick(int x, int y)
 			worldViewInv = worldViewInv.inverse();
 
 			// Todo get actual screen width and height
+			auto windowWidth = DXUTGetWindowWidth();
+			auto windowHeight = DXUTGetWindowHeight();
+
+			//std::cout << "window: " << windowHeight << "; " << windowWidth << std::endl;
+
 			/*
 			RECT rect;
 			if (GetWindowRect(hwnd, &rect))
@@ -402,8 +407,8 @@ void DiffusionSimulator::onClick(int x, int y)
 			}*/
 
 			Vec3 position = Vec3(x, y, 0);
-			// Vec3 halfScreen = Vec3(width/2, height/2, 1);
-			Vec3 halfScreen = Vec3(630, 320, 1);
+			Vec3 halfScreen = Vec3(windowWidth/2, windowHeight/2, 1);
+			//Vec3 halfScreen = Vec3(630, 320, 1);
 
 			Vec3 homoneneousPosition = (position - halfScreen) / halfScreen;
 			// so sry about magic numbers, but that's what these are ... :D
@@ -414,7 +419,7 @@ void DiffusionSimulator::onClick(int x, int y)
 			homoneneousPosition.y = -0.4 * homoneneousPosition.z * homoneneousPosition.y;
 			homoneneousPosition.x = 0.77 * homoneneousPosition.z * homoneneousPosition.x;
 
-			std::cout << "position : " << position << "; homoneneous position: " << homoneneousPosition << std::endl;
+			//std::cout << "position : " << position << "; homoneneous position: " << homoneneousPosition << std::endl;
 
 			Vec3 worldPosition = worldViewInv.transformVector(homoneneousPosition);
 
@@ -422,7 +427,7 @@ void DiffusionSimulator::onClick(int x, int y)
 			Mat4 rotation = Mat4();
 
 			duringCreationRigidBody = new RigidBody(worldPosition, Quat(rotation), Vec3(0.1, 0.1, 0.1), 0.1f);
-			std::cout << "world position: " << duringCreationRigidBody->position_x << std::endl;
+			//std::cout << "world position: " << duringCreationRigidBody->position_x << std::endl;
 		}
 	}
 		if (chargingForce && duringCreationRigidBody != nullptr) {
@@ -439,7 +444,7 @@ void DiffusionSimulator::onClick(int x, int y)
 				Vec3 inputView = Vec3((float)mouseDiff.x, (float)-mouseDiff.y, 0);
 				Vec3 inputWorld = worldViewInv.transformVectorNormal(inputView);
 
-				std::cout << "changing rotation from " << duringCreationRigidBody->orientation_r << "to ";
+				//std::cout << "changing rotation from " << duringCreationRigidBody->orientation_r << "to ";
 
 				//Quat change = Quat(inputWorld.x, inputWorld.y, inputWorld.z);
 				// std::cout << inputWorld << ", its now ";
@@ -460,7 +465,7 @@ void DiffusionSimulator::onClick(int x, int y)
 
 				duringCreationRigidBody->orientation_r = q.unit();
 
-				std::cout << duringCreationRigidBody->orientation_r << std::endl;
+				//std::cout << duringCreationRigidBody->orientation_r << std::endl;
 			}
 		}
 }
