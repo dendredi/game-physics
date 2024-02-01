@@ -2,13 +2,18 @@
 #include "pcgsolver.h"
 using namespace std;
 
-#define INIT_M 32 // rows
-#define INIT_N 32 // cols
+#define GRID_DIM 40 // columns and rows
+#define GRID_SIZE 2 // Absolute distance to which the grid is scaled
 
+#define SPATIAL_DELTA 10
+#define WAVE_SPEED 300
+#define CULLING_PROJECTION_RADIUS 6
+#define WATER_ZERO_HEIGHT -0.5
+
+// TODO: Remove 
 #define ALPHA 15
 #define INIT_HIGH_TEMP 1
 
-#define CULLING_PROJECTION_RADIUS 6
 
 // --- Rigid body ---
 
@@ -199,7 +204,7 @@ void DiffusionSimulator::handleCollisions()
 		}
 	}
 
-	// Handle collision with grid
+	// Handle collision with water
 	for each (auto rb in rigidBodies) {
 		if (rb->gridHit) {
 			continue;
@@ -209,7 +214,6 @@ void DiffusionSimulator::handleCollisions()
 			auto info = checkCollisionSAT(rb->getObject2WorldMatrix(), gp->getObject2WorldMatrix());
 			if (info.isValid) {
 				rb->gridHit = true;
-				//gp->hit = true; // TODO
 
 				//T.set(gp->x, gp->y, T.get(gp->x, gp->y) + 1);
 				T.set(gp->x, gp->y, 1);
@@ -258,8 +262,6 @@ void DiffusionSimulator::handleOneCollision(int indexA, int indexB)
 	// Angular
 	A->angularMomentum_L += cross(x_a, Jn);
 	B->angularMomentum_L -= cross(x_b, Jn);
-
-	
 }
 
 void DiffusionSimulator::onClick(int x, int y)
@@ -357,67 +359,32 @@ int index(int row, int col, int totalCols) {
 void GridPixel::update() {
 	Real value = grid->get(x, y);
 
-	Real scaleX = 1.0 / grid->cols;
-	Real scaleZ = 1.0 / grid->rows;
+	Real scaleHorizontal = 1.0 / GRID_DIM * GRID_SIZE ;
 
-	Real normalizedValue = value / 100;
+	Real scaledValue = value / 100;
 
-	// TODO: Think about cleaner way
 	this->pos = Vec3(
-		x * scaleX - 0.5 + (scaleX * 0.5),
-		normalizedValue * 0.5 - 0.5,
-		y * scaleZ - 0.5 + (scaleZ * 0.5)
+		x * scaleHorizontal - (GRID_SIZE / 2),
+		scaledValue + WATER_ZERO_HEIGHT,
+		y * scaleHorizontal - (GRID_SIZE / 2)
 	);
 
 	Mat4 posMat = Mat4();
 	posMat.initTranslation(pos.x, pos.y, pos.z);
 
 	Mat4 sizeMat = Mat4();
-	sizeMat.initScaling(scaleX, normalizedValue, scaleZ);
+	sizeMat.initScaling(scaleHorizontal, abs(scaledValue) + .01, scaleHorizontal);
 
 	object2WorldMatrix = sizeMat * posMat;
-	color = Vec3(normalizedValue, 0, 1.0f - normalizedValue);
+
+	float white_part = std::min(1.0, abs(scaledValue));
+	color = Vec3(white_part, white_part, 1);
 }
 
-/*
-void GridPixel::update() {
-	Real value = grid->get(x, y);
-
-	Real scaleX = 1.0 / grid->cols;
-	Real scaleZ = 1.0 / grid->rows;
-
-	//Real normalizedValue = (value - normInterval.first) / (normInterval.second - normInterval.first);
-
-	// TODO: Think about cleaner way
-	this->pos = Vec3(
-		x * scaleX - 0.5 + (scaleX * 0.5),
-		value, // normalizedValue * 0.5 - 0.5,
-		y * scaleZ - 0.5 + (scaleZ * 0.5)
-	);
-
-	Mat4 posMat = Mat4();
-	posMat.initTranslation(pos.x, pos.y, pos.z);
-
-	Mat4 sizeMat = Mat4();
-	sizeMat.initScaling(scaleX, normalizedValue, scaleZ);
-
-	object2WorldMatrix = sizeMat * posMat;
-	color = Vec3(normalizedValue, 0, 1.0f - normalizedValue);
-}
-*/
 
 void GridPixel::draw(DrawingUtilitiesClass* DUC)
 {
-	// TODO: Implement properly
-	if (hit) {
-		auto col = Vec3(0,1,0);
-		DUC->setUpLighting(col, col, 100, col);
-	}
-	else {
-		DUC->setUpLighting(color, color, 100, color);
-	}
-
-	//DUC->setUpLighting(color, color, 100, color);
+	DUC->setUpLighting(color, color, 100, color);
 	DUC->drawRigidBody(object2WorldMatrix);
 }
 
@@ -586,7 +553,7 @@ DiffusionSimulator::DiffusionSimulator()
 	m_vfMovableObjectFinalPos = Vec3();
 	m_vfRotate = Vec3();
 
-	updateDimensions(INIT_M, INIT_N); // TODO: Change this.
+	updateDimensions(GRID_DIM, GRID_DIM);
 
 	Real window[9] = { 0.0, 1.0, 0.0, 1.0, -4.0, 1.0, 0.0, 1.0, 0.0 };
 	spatial_convolution_window = Grid(3, 3, window);
@@ -602,22 +569,10 @@ void DiffusionSimulator::reset(){
 		m_oldtrackmouse.x = m_oldtrackmouse.y = 0;
 }
 
-void DiffusionSimulator::callbackSetM(const void* value, void* clientData) {
-	//updateDimensions(value, T.cols);
-}
-
-void DiffusionSimulator::callbackSetN(const void* value, void* clientData) {
-	//updateDimensions(T.rows, value);
-}
 
 void DiffusionSimulator::initUI(DrawingUtilitiesClass * DUC)
 {
 	this->DUC = DUC;
-	updateDimensions(T.rows, T.cols);
-
-	// TODO
-	//TwAddVarCB(DUC->g_pTweakBar, "m", TW_TYPE_INT32, callbackSetM, NULL, NULL, "min=10 max=100");
-
 	initSetup_RB();
 }
 
@@ -645,26 +600,15 @@ void DiffusionSimulator::notifyCaseChanged(int testCase)
 
 
 void DiffusionSimulator::diffuseTemperatureExplicit(float timeStep) {
-	Real c = 100;
-	Real spatial_delta = 10;
-	
-	Grid laplace = T.convolution(spatial_convolution_window);
+	Grid laplace = T.convolution(spatial_convolution_window) * (1.0 / (SPATIAL_DELTA * SPATIAL_DELTA));
 
-	for (int i = 0; i < T.rows; ++i) {
-		for (int j = 0; j < T.cols; ++j) {
-			if (i == 0 || j == 0 || i == T.rows - 1 || j == T.cols - 1) {
-				// Do not touch borders
-			}
-			else {
-				Real currentValue = T.get(i, j);
-				Real oldValue = T_t_minus_one.get(i, j);
-				Real second_spatial_deriv = laplace.get(i - 1, j - 1) / (spatial_delta * spatial_delta);
+	// Do not touch borders -> Dirichlet Boundary 
+	for (int i = 1; i < T.rows - 1; ++i) {
+		for (int j = 1; j < T.cols - 1; ++j) {
+			Real u_ij_new = WAVE_SPEED * WAVE_SPEED * timeStep * timeStep * laplace.get(i - 1, j - 1) + 2 * T.get(i, j) - T_t_minus_one.get(i, j);
 
-				Real newValue = c * c * timeStep * timeStep * second_spatial_deriv + 2 * currentValue - oldValue;
-				
-				T_t_minus_one.set(i, j, T.get(i, j));
-				T.set(i, j, newValue);
-			}
+			T_t_minus_one.set(i, j, T.get(i, j));
+			T.set(i, j, u_ij_new);
 		}
 	}
 }

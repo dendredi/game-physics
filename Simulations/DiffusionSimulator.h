@@ -74,7 +74,6 @@ public:
 	Real get(int row, int col) const;
 	void set(int row, int col, Real value);
 
-	// Overloading the + operator
 	Grid operator*(const Real scalar) const;
 
 	// Min and max values
@@ -105,8 +104,6 @@ public:
 	static std::vector<GridPixel*> initPixelsFromGrid(Grid* grid);
 	Mat4 getObject2WorldMatrix();
 
-	// TODO: Remove
-	bool hit = false;
 	Vec3 pos; // TODO: Think about cleaner way
 };
 
