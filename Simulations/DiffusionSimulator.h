@@ -162,6 +162,10 @@ private:
 	Point2D m_oldtrackmouse;
 	Grid T;
 
+	// Needed for wave equation
+	Grid T_t_minus_one;
+	Grid spatial_convolution_window;
+
 	Real grid_minX;
 	Real grid_maxX;
 

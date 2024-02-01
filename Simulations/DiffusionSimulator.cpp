@@ -6,7 +6,7 @@ using namespace std;
 #define INIT_N 32 // cols
 
 #define ALPHA 15
-#define INIT_HIGH_TEMP 10
+#define INIT_HIGH_TEMP 1
 
 #define CULLING_PROJECTION_RADIUS 6
 
@@ -209,10 +209,10 @@ void DiffusionSimulator::handleCollisions()
 			auto info = checkCollisionSAT(rb->getObject2WorldMatrix(), gp->getObject2WorldMatrix());
 			if (info.isValid) {
 				rb->gridHit = true;
-				gp->hit = true; // TODO
+				//gp->hit = true; // TODO
 
 				//T.set(gp->x, gp->y, T.get(gp->x, gp->y) + 1);
-				T.set(gp->x, gp->y, INIT_HIGH_TEMP);
+				T.set(gp->x, gp->y, 1);
 			}
 		}
 	}
@@ -220,8 +220,7 @@ void DiffusionSimulator::handleCollisions()
 
 
 void DiffusionSimulator::handleOneCollision(int indexA, int indexB)
-{
-	
+{	
 	RigidBody* A = rigidBodies[indexA];
 	RigidBody* B = rigidBodies[indexB];
 
@@ -361,7 +360,7 @@ void GridPixel::update() {
 	Real scaleX = 1.0 / grid->cols;
 	Real scaleZ = 1.0 / grid->rows;
 
-	Real normalizedValue = (value - normInterval.first) / (normInterval.second - normInterval.first);
+	Real normalizedValue = value / 100;
 
 	// TODO: Think about cleaner way
 	this->pos = Vec3(
@@ -379,6 +378,33 @@ void GridPixel::update() {
 	object2WorldMatrix = sizeMat * posMat;
 	color = Vec3(normalizedValue, 0, 1.0f - normalizedValue);
 }
+
+/*
+void GridPixel::update() {
+	Real value = grid->get(x, y);
+
+	Real scaleX = 1.0 / grid->cols;
+	Real scaleZ = 1.0 / grid->rows;
+
+	//Real normalizedValue = (value - normInterval.first) / (normInterval.second - normInterval.first);
+
+	// TODO: Think about cleaner way
+	this->pos = Vec3(
+		x * scaleX - 0.5 + (scaleX * 0.5),
+		value, // normalizedValue * 0.5 - 0.5,
+		y * scaleZ - 0.5 + (scaleZ * 0.5)
+	);
+
+	Mat4 posMat = Mat4();
+	posMat.initTranslation(pos.x, pos.y, pos.z);
+
+	Mat4 sizeMat = Mat4();
+	sizeMat.initScaling(scaleX, normalizedValue, scaleZ);
+
+	object2WorldMatrix = sizeMat * posMat;
+	color = Vec3(normalizedValue, 0, 1.0f - normalizedValue);
+}
+*/
 
 void GridPixel::draw(DrawingUtilitiesClass* DUC)
 {
@@ -561,25 +587,9 @@ DiffusionSimulator::DiffusionSimulator()
 	m_vfRotate = Vec3();
 
 	updateDimensions(INIT_M, INIT_N); // TODO: Change this.
-	
-	/*
-	float matrixArr[25] = { 
-		3.0, 3.0, 2.0, 1.0, 0.0,
-		0.0, 0.0, 1.0, 3.0, 1.0,
-		3.0, 1.0, 2.0, 2.0, 3.0,
-		2.0, 0.0, 0.0, 2.0, 2.0,
-		2.0, 0.0, 0.0, 0.0, 1.0,
-	};
-	float windowArr[9] = { 0.0, 1.0, 2.0, 2.0, 2.0, 0.0, 0.0, 1.0, 2.0 };
 
-	Grid matrix = Grid(5, 5, matrixArr);
-	Grid window = Grid(3, 3, windowArr);
-	Grid result = matrix.convolution(window);
-
-	std::cout << "Matrix:" << endl << matrix.to_string();
-	std::cout << "Window:" << endl << window.to_string();
-	std::cout << "Result:" << endl << result.to_string();
-	*/
+	Real window[9] = { 0.0, 1.0, 0.0, 1.0, -4.0, 1.0, 0.0, 1.0, 0.0 };
+	spatial_convolution_window = Grid(3, 3, window);
 }
 
 const char * DiffusionSimulator::getTestCasesStr(){
@@ -633,9 +643,36 @@ void DiffusionSimulator::notifyCaseChanged(int testCase)
 	}
 }
 
+
+void DiffusionSimulator::diffuseTemperatureExplicit(float timeStep) {
+	Real c = 100;
+	Real spatial_delta = 10;
+	
+	Grid laplace = T.convolution(spatial_convolution_window);
+
+	for (int i = 0; i < T.rows; ++i) {
+		for (int j = 0; j < T.cols; ++j) {
+			if (i == 0 || j == 0 || i == T.rows - 1 || j == T.cols - 1) {
+				// Do not touch borders
+			}
+			else {
+				Real currentValue = T.get(i, j);
+				Real oldValue = T_t_minus_one.get(i, j);
+				Real second_spatial_deriv = laplace.get(i - 1, j - 1) / (spatial_delta * spatial_delta);
+
+				Real newValue = c * c * timeStep * timeStep * second_spatial_deriv + 2 * currentValue - oldValue;
+				
+				T_t_minus_one.set(i, j, T.get(i, j));
+				T.set(i, j, newValue);
+			}
+		}
+	}
+}
+
+/*
 void DiffusionSimulator::diffuseTemperatureExplicit(float timeStep) {
 	Real window[9] = {0.0, 1.0, 0.0, 1.0, -4.0, 1.0, 0.0, 1.0, 0.0};
-	Grid laplace = T.convolution(Grid(3, 3, window)) * (1.0f / timeStep * timeStep); // TODO: Check !!! 
+	Grid laplace = T.convolution(Grid(3, 3, window)) * (1.0f / timeStep * timeStep); // TODO: Check !!!
 
 	for (int i = 0; i < T.rows; ++i) {
 		for (int j = 0; j < T.cols; ++j) {
@@ -651,6 +688,7 @@ void DiffusionSimulator::diffuseTemperatureExplicit(float timeStep) {
 		}
 	}
 }
+*/
 
 
 void DiffusionSimulator::diffuseTemperatureImplicit(float timeStep) {
@@ -747,15 +785,25 @@ void DiffusionSimulator::updateDimensions(int m, int n)
 {
 	this->T = Grid(m, n); // All 0
 	
-	for (int i = 0.5 * T.rows; i < 0.8 * T.rows; ++i) {
-		for (int j = 0.5 * T.cols; j < 0.8 * T.cols; ++j) {
-			T.set(i, j, INIT_HIGH_TEMP);
+	for (int i = 0; i < T.rows; ++i) {
+		for (int j = 0; j < T.cols; ++j) {
+			T.set(i, j, 0);
 		}
 	}
+
+	/*
+	for (int i = 0.5 * T.rows; i < 0.8 * T.rows; ++i) {
+		for (int j = 0.5 * T.cols; j < 0.8 * T.cols; ++j) {
+			T.set(i, j, 2);
+		}
+	}
+	*/
 	
 	this->pixels = GridPixel::initPixelsFromGrid(&T);
 
 	initGridIntervals();
+
+	this->T_t_minus_one = Grid(m, n);
 }
 
 void DiffusionSimulator::updatePixels()
