@@ -224,17 +224,20 @@ void DiffusionSimulator::handleCollisions()
 				rb->gridHit = true;
 
 				//T.set(gp->x, gp->y, T.get(gp->x, gp->y) + 1);
-				T.set(gp->x, gp->y, 1);
+				T.set(gp->x, gp->y, 1); // TODO
 			}
 		}
 	}
 
+	std::vector<int> rb_indices_to_delete = std::vector<int>();
+
 	//Handle collision with wall
-	for each (auto rb in rigidBodies) {
+	for (int i = 0; i < rigidBodies.size(); ++i) {
+		auto rb = rigidBodies.at(i);
 		// wall at 1 x (rechts)
 		if ((rb->position_x.x + rb->size.x * 0.5) > 1) {
 			if (rb->linearVelocity_v.x > 0) {
-				rb->linearVelocity_v.x = - rb->linearVelocity_v.x;
+				rb->linearVelocity_v.x = -rb->linearVelocity_v.x;
 			}
 		}
 		// wall at - 1 x (links)
@@ -263,6 +266,15 @@ void DiffusionSimulator::handleCollisions()
 				rb->linearVelocity_v.y = -rb->linearVelocity_v.y;
 			}
 		}
+
+		if (rb->gridHit && rb->position_x.y + rb->size.y * 0.5 < WATER_ZERO_HEIGHT) {
+			rb_indices_to_delete.push_back(i);
+		}
+	}
+
+	for each (auto i in rb_indices_to_delete)
+	{
+		rigidBodies.erase(rigidBodies.begin() + i);
 	}
 
 	/*
@@ -312,7 +324,7 @@ void DiffusionSimulator::handleCollisions()
 			// Angular
 			rb->angularMomentum_L += cross(x_a, Jn);
 
-			
+
 		}
 	}
 	*/
