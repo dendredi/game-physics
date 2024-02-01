@@ -147,8 +147,8 @@ void DiffusionSimulator::initSetup_RB() {
 	// Initial velocity
 	rect->linearVelocity_v = force_dir;
 
-	ExternalForce* force = new ExternalForce(force_dir, Vec3(-1.1, 1, 0));
-	rect->applyExternalForce(force);
+	// ExternalForce* force = new ExternalForce(force_dir, Vec3(-1.1, 1, 0));
+	// rect->applyExternalForce(force);
 
 	rigidBodies.push_back(rect);
 
@@ -218,6 +218,41 @@ void DiffusionSimulator::handleCollisions()
 	}
 
 	//Handle collision with wall
+	for each (auto rb in rigidBodies) {
+		// wall at 1.5 x (rechts)
+		if ((rb->position_x.x + rb->size.x * 0.5) > 1.5) {
+			if (rb->linearVelocity_v.x > 0) {
+				rb->linearVelocity_v.x = - rb->linearVelocity_v.x;
+			}
+		}
+		// wall at - 1.5 x (links)
+		if ((rb->position_x.x + rb->size.x * 0.5) < - 1.5) {
+			if (rb->linearVelocity_v.x < 0) {
+				rb->linearVelocity_v.x = -rb->linearVelocity_v.x;
+			}
+		}
+
+		// wall at 1.5 z
+		if ((rb->position_x.z + rb->size.z * 0.5) > 1.5) {
+			if (rb->linearVelocity_v.z > 0) {
+				rb->linearVelocity_v.z = -rb->linearVelocity_v.z;
+			}
+		}
+		// wall at - 1.5 z
+		if ((rb->position_x.z + rb->size.z * 0.5) < -1.5) {
+			if (rb->linearVelocity_v.z < 0) {
+				rb->linearVelocity_v.z = -rb->linearVelocity_v.z;
+			}
+		}
+
+		// wall at 1.5 y (oben)
+		if ((rb->position_x.y + rb->size.y * 0.5) > 1.5) {
+			if (rb->linearVelocity_v.y > 0) {
+				rb->linearVelocity_v.y = -rb->linearVelocity_v.y;
+			}
+		}
+	}
+
 	/*
 	for each (auto rb in rigidBodies) {
 		Mat4 scalingMatrix = Mat4();
@@ -430,8 +465,11 @@ void DiffusionSimulator::onMouse(int x, int y)
 			Vec3 inputWorld = worldViewInv.transformVectorNormal(inputView);
 			//std::cout << "Force Vec in world coords: " << inputWorld << std::endl;
 			 
-			applyForceOnBody(id, getPositionOfRigidBody(id), inputWorld * -0.01);
+			// applyForceOnBody(id, getPositionOfRigidBody(id), inputWorld * -0.01);
 			// Todo this Force seems to just keep existing, it should'nt?
+
+			duringCreationRigidBody->linearVelocity_v = inputWorld * -0.05;
+
 		}
 
 		duringCreationRigidBody = nullptr;
