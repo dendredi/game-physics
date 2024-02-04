@@ -411,11 +411,16 @@ void DiffusionSimulator::onClick(int x, int y)
 			//Vec3 halfScreen = Vec3(630, 320, 1);
 
 			Vec3 homoneneousPosition = (position - halfScreen) / halfScreen;
-			// so sry about magic numbers, but that's what these are ... :D
+
+			Vec3 cameraPosition = worldViewInv.transformVector(Vec3(0, 0, 0));
+			double cameraDistance = sqrt(cameraPosition.squaredDistanceTo(Vec3(0, 0, 0)));
+			//std::cout << "cameraDistance: " << cameraDistance << std::endl;
+
+			// the old magic numbers, but not anymore... :D
 			//homoneneousPosition.z = 2;
 			//homoneneousPosition.y = -0.8 * homoneneousPosition.y;
 			//homoneneousPosition.x = 1.65 * homoneneousPosition.x;
-			homoneneousPosition.z = 2;
+			homoneneousPosition.z = cameraDistance;
 			homoneneousPosition.y = -0.4 * homoneneousPosition.z * homoneneousPosition.y;
 			homoneneousPosition.x = 0.77 * homoneneousPosition.z * homoneneousPosition.x;
 
