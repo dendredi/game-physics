@@ -472,8 +472,14 @@ void GridPixel::update() {
 
 	object2WorldMatrix = sizeMat * posMat;
 
-	float white_part = std::min(1.0, abs(scaledValue));
-	color = Vec3(white_part, white_part, 1);
+	if (x == 0 || x == GRID_DIM - 1 || y == 0 || y == GRID_DIM - 1) {
+		// Borders
+		color = Vec3(0, 0, 0);
+	}
+	else {
+		float white_part = std::min(1.0, abs(scaledValue));
+		color = Vec3(white_part, white_part, 1);
+	}
 }
 
 
