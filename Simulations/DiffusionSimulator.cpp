@@ -10,11 +10,9 @@ using namespace std;
 #define CULLING_PROJECTION_RADIUS 6
 #define WATER_ZERO_HEIGHT -0.5
 #define DAMPING 0.999
-#define WATER_COLLISION_FACTOR 0.2
-
-// TODO: Remove 
-#define ALPHA 15
-#define INIT_HIGH_TEMP 1
+#define WATER_COLLISION_FACTOR 0.4
+#define WATER_COLLISION_DOWNSPEED 0.5
+#define BOUNCYNESS 0.7
 
 
 // --- Rigid body ---
@@ -140,25 +138,33 @@ void DiffusionSimulator::applyForceOnBody(int i, Vec3 loc, Vec3 force) {
 
 void DiffusionSimulator::initSetup_RB() {
 	rigidBodies.clear();
-
-	Vec3 position = Vec3(-1, 1, 0);
+	
 	Vec3 size = Vec3(.1, 0.1, 0.1);
 
-	Mat4 rotMat = Mat4();
-	rotMat.initRotationZ(90);
+	Vec3 position_1 = Vec3(-1, 1, -1);
+	Vec3 dir_1 = Vec3(1, -1, 1) * 3;
 
-	RigidBody* rect = new RigidBody(position, Quat(rotMat), size, 2);
+	Mat4 rot_1 = Mat4();
+	rot_1.initRotationXYZ(0, 0, 0);
 
-	Vec3 force_dir = Vec3(.5, -1, 0) * 2;
+	Vec3 position_2 = Vec3(1, 1, 1);
+	Vec3 dir_2 = Vec3(-1, -1, -1) * 3;
+
+	Mat4 rot_2 = Mat4();
+	rot_2.initRotationXYZ(0, 45, 0);
+
+
+	RigidBody* rect_1 = new RigidBody(position_1, Quat(rot_1), size, 1);
+	RigidBody* rect_2 = new RigidBody(position_2, Quat(rot_2), size, 1);
+
 
 	// Initial velocity
-	rect->linearVelocity_v = force_dir;
+	rect_1->linearVelocity_v = dir_1;
+	rect_2->linearVelocity_v = dir_2;
 
-	// ExternalForce* force = new ExternalForce(force_dir, Vec3(-1.1, 1, 0));
-	// rect->applyExternalForce(force);
 
-	rigidBodies.push_back(rect);
-
+	rigidBodies.push_back(rect_1);
+	rigidBodies.push_back(rect_2);
 }
 
 Quat normalzeQuat(Quat quaternion) {
@@ -223,9 +229,15 @@ void DiffusionSimulator::handleCollisions()
 				rb->gridHit = true;
 
 				auto current = T.get(gp->x, gp->y);
-				auto impulse = rb->mass_m * vec_length(rb->linearVelocity_v);
+				auto v = vec_length(rb->linearVelocity_v);
+				auto impulse = rb->mass_m * v;
 				T.set(gp->x, gp->y, current + impulse * WATER_COLLISION_FACTOR);
 			}
+		}
+
+		if (rb->gridHit) {
+			// Move rb downwards after collision with water
+			rb->linearVelocity_v.y -= vec_length(rb->linearVelocity_v) * WATER_COLLISION_DOWNSPEED;
 		}
 	}
 
@@ -272,9 +284,9 @@ void DiffusionSimulator::handleCollisions()
 		}
 	}
 
-	for each (auto i in rb_indices_to_delete)
+	for (int i = rb_indices_to_delete.size() - 1; i >= 0; --i)
 	{
-		rigidBodies.erase(rigidBodies.begin() + i);
+		rigidBodies.erase(rigidBodies.begin() + rb_indices_to_delete.at(i));
 	}
 
 }
@@ -293,7 +305,6 @@ void DiffusionSimulator::handleOneCollision(int indexA, int indexB)
 	B->externalForces.clear();
 
 
-	float c = 0.1;
 	const Vec3 n = info.normalWorld; // From B to A
 
 	Vec3 x_a = info.collisionPointWorld - A->position_x;
@@ -311,7 +322,7 @@ void DiffusionSimulator::handleOneCollision(int indexA, int indexB)
 	// Further compute formula
 	Vec3 intermediate = cross(A->getInverseInertiaTensorRotated().transformVector(cross(x_a, n)), x_a) +
 		cross(B->getInverseInertiaTensorRotated().transformVector(cross(x_b, n)), x_b);
-	auto J = (-(1 + c) * v_rel_dot_n) / ((1 / A->mass_m) + (1 / B->mass_m) + dot(intermediate, n));
+	auto J = (-(1 + BOUNCYNESS) * v_rel_dot_n) / ((1 / A->mass_m) + (1 / B->mass_m) + dot(intermediate, n));
 	
 	// Update
 
@@ -637,14 +648,14 @@ DiffusionSimulator::DiffusionSimulator()
 	m_vfMovableObjectFinalPos = Vec3();
 	m_vfRotate = Vec3();
 
-	updateDimensions(GRID_DIM, GRID_DIM);
+	initSetup_PDE();
 
 	Real window[9] = { 0.0, 1.0, 0.0, 1.0, -4.0, 1.0, 0.0, 1.0, 0.0 };
 	spatial_convolution_window = Grid(3, 3, window);
 }
 
 const char * DiffusionSimulator::getTestCasesStr(){
-	return "Explicit_solver, Implicit_solver";
+	return "Explicit_solver";
 }
 
 void DiffusionSimulator::reset(){
@@ -658,6 +669,7 @@ void DiffusionSimulator::initUI(DrawingUtilitiesClass * DUC)
 {
 	this->DUC = DUC;
 	initSetup_RB();
+	initSetup_PDE();
 }
 
 void DiffusionSimulator::notifyCaseChanged(int testCase)
@@ -665,16 +677,11 @@ void DiffusionSimulator::notifyCaseChanged(int testCase)
 	m_iTestCase = testCase;
 	m_vfMovableObjectPos = Vec3(0, 0, 0);
 	m_vfRotate = Vec3(0, 0, 0);
-	//
-	// to be implemented
-	//
+
 	switch (m_iTestCase)
 	{
 	case 0:
 		cout << "Explicit solver!\n";
-		break;
-	case 1:
-		cout << "Implicit solver!\n";
 		break;
 	default:
 		cout << "Empty Test!\n";
@@ -698,141 +705,21 @@ void DiffusionSimulator::diffuseTemperatureExplicit(float timeStep) {
 	}
 }
 
-/*
-void DiffusionSimulator::diffuseTemperatureExplicit(float timeStep) {
-	Real window[9] = {0.0, 1.0, 0.0, 1.0, -4.0, 1.0, 0.0, 1.0, 0.0};
-	Grid laplace = T.convolution(Grid(3, 3, window)) * (1.0f / timeStep * timeStep); // TODO: Check !!!
-
-	for (int i = 0; i < T.rows; ++i) {
-		for (int j = 0; j < T.cols; ++j) {
-			if (i == 0 || j == 0 || i == T.rows - 1 || j == T.cols - 1) {
-				// Do not touch borders
-			}
-			else {
-				Real currentValue = T.get(i, j);
-				Real time_derivative_ij = ALPHA * laplace.get(i - 1, j - 1);
-				Real newValue = currentValue + time_derivative_ij * timeStep;
-				T.set(i, j, newValue);
-			}
-		}
-	}
-}
-*/
-
-
-void DiffusionSimulator::diffuseTemperatureImplicit(float timeStep) {
-	// solve A x = b
-
-	const int N = T.cols * T.rows;
-
-	SparseMatrix<Real> A(N);
-	std::vector<Real> b(N);
-
-	Real lambda = ALPHA * timeStep / (1 * 1); // TODO: WTF
-
-	/*
-	assemble the system matrix A 
-	*/
-	
-	// First row
-	std::vector<int> indices{ 0, 1 };
-	std::vector<Real> values{ 1.0f + 2.0f * lambda, - lambda };
-	A.add_sparse_row(0, indices, values);
-
-	// Last row
-	indices = std::vector<int>{ N-2, N-1 };
-	values = std::vector<Real>{ -lambda,  1.0f + 2.0f * lambda };
-	A.add_sparse_row(N - 1, indices, values);
-
-	// In between
-	values = std::vector<Real>{ -lambda,  1.0f + 2.0f * lambda, -lambda };
-	for (int i = 1; i < N - 1; ++i) {
-		indices = std::vector<int>{ i - 1, i, i + 1 };
-		A.add_sparse_row(i, indices, values);
-	}
-
-	/*
-	assemble the right - hand side b
-	*/
-
-	b = T.to_vector();
-
-
-	/* --- Do not touch --- */
-	Real pcg_target_residual = 1e-05;
-	Real pcg_max_iterations = 1000;
-	Real ret_pcg_residual = 1e10;
-	int  ret_pcg_iterations = -1;
-
-	SparsePCGSolver<Real> solver;
-	solver.set_solver_parameters(pcg_target_residual, pcg_max_iterations, 0.97, 0.25);
-
-	std::vector<Real> x(N);
-	for (int j = 0; j < N; ++j) { x[j] = 0.; }
-
-	solver.solve(A, b, x, ret_pcg_residual, ret_pcg_iterations, 0);
-	/* --- Do not touch --- */
-
-
-	T.update_from_vector(x);
-}
-
-void diffuseTemperatureImplicit_TEMPLATE(float timeStep) {
-	// solve A x = b
-
-	// This is just an example to show how to work with the PCG solver,
-	const int nx = 5;
-	const int ny = 5;
-	const int nz = 5;
-	const int N = nx * ny * nz;
-
-	SparseMatrix<Real> A(N);
-	std::vector<Real> b(N);
-
-	// This is the part where you have to assemble the system matrix A and the right-hand side b!
-
-	// perform solve
-	Real pcg_target_residual = 1e-05;
-	Real pcg_max_iterations = 1000;
-	Real ret_pcg_residual = 1e10;
-	int  ret_pcg_iterations = -1;
-
-	SparsePCGSolver<Real> solver;
-	solver.set_solver_parameters(pcg_target_residual, pcg_max_iterations, 0.97, 0.25);
-
-	std::vector<Real> x(N);
-	for (int j = 0; j < N; ++j) { x[j] = 0.; }
-
-	// preconditioners: 0 off, 1 diagonal, 2 incomplete cholesky
-	solver.solve(A, b, x, ret_pcg_residual, ret_pcg_iterations, 0);
-
-	// Final step is to extract the grid temperatures from the solution vector x
-	// to be implemented
-}
-
-void DiffusionSimulator::updateDimensions(int m, int n)
+void DiffusionSimulator::initSetup_PDE()
 {
-	this->T = Grid(m, n); // All 0
+	this->T = Grid(GRID_DIM, GRID_DIM); // All 0
 	
 	for (int i = 0; i < T.rows; ++i) {
 		for (int j = 0; j < T.cols; ++j) {
 			T.set(i, j, 0);
 		}
 	}
-
-	/*
-	for (int i = 0.5 * T.rows; i < 0.8 * T.rows; ++i) {
-		for (int j = 0.5 * T.cols; j < 0.8 * T.cols; ++j) {
-			T.set(i, j, 2);
-		}
-	}
-	*/
 	
 	this->pixels = GridPixel::initPixelsFromGrid(&T);
 
 	initGridIntervals();
 
-	this->T_t_minus_one = Grid(m, n);
+	this->T_t_minus_one = Grid(GRID_DIM, GRID_DIM);
 }
 
 void DiffusionSimulator::updatePixels()
@@ -849,17 +736,7 @@ void DiffusionSimulator::simulateTimestep(float timeStep)
 }
 
 void DiffusionSimulator::simulateTimestep_PDE(float timeStep) {
-	// update current setup for each frame
-	switch (m_iTestCase)
-	{
-	case 0:
-		diffuseTemperatureExplicit(timeStep);
-		break;
-	case 1:
-		diffuseTemperatureImplicit(timeStep);
-		break;
-	}
-
+	diffuseTemperatureExplicit(timeStep);
 	updatePixels();
 }
 

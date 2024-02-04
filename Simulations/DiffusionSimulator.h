@@ -124,12 +124,8 @@ public:
 
 	// Feel free to change the signature of these functions, add arguments, etc.
 	void diffuseTemperatureExplicit(float timeStep);
-	void diffuseTemperatureImplicit(float timeStep);
 
-	void updateDimensions(int m, int n);
-
-	void callbackSetM(const void* value, void* clientData);
-	void callbackSetN(const void* value, void* clientData);
+	void initSetup_PDE();
 
 	// --- Rigid Bodies ---
 	void initSetup_RB();
