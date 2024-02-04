@@ -158,12 +158,6 @@ void DiffusionSimulator::initSetup_RB() {
 
 	rigidBodies.push_back(rect);
 
-
-	// test wall
-	
-	// RigidBody* wall = new RigidBody(Vec3(1, 0, 0), Quat(rotMat), Vec3(2, 0.5, 2), 100000);
-	// rigidBodies.push_back(wall);
-
 }
 
 Quat normalzeQuat(Quat quaternion) {
@@ -277,58 +271,6 @@ void DiffusionSimulator::handleCollisions()
 		rigidBodies.erase(rigidBodies.begin() + i);
 	}
 
-	/*
-	for each (auto rb in rigidBodies) {
-		Mat4 scalingMatrix = Mat4();
-		scalingMatrix.initScaling(1000, 2, 2);
-		Mat4 translationMatrix = Mat4();
-		translationMatrix.initTranslation(501, 0, 0);
-		auto info = checkCollisionSAT(rb->getObject2WorldMatrix(), scalingMatrix * translationMatrix);
-		if (info.isValid) {
-
-			rb->externalForces.clear();
-
-			std::cout << "WALL" << std::endl;
-
-			float c = 0.1;
-			const Vec3 n = info.normalWorld; // From B to A
-
-			Vec3 x_a = info.collisionPointWorld - rb->position_x;
-			Vec3 x_b = info.collisionPointWorld - 1;
-
-			Vec3 v_rel = rb->getTotalVelocityAtLocalPositiion(x_a);
-
-			auto v_rel_dot_n = dot(v_rel, n);
-
-			if (v_rel_dot_n > 0) {
-				// Bodies are already separating
-				return;
-			}
-
-			Mat4 bigMassFakeInertiaTensor = Mat4();
-			double arr[16] = { 1000000, 0, 0, 0, 0, 1000, 0, 0, 0, 0, 1000, 0, 0, 0, 0, 1 };
-			bigMassFakeInertiaTensor.initFromArray(arr);
-
-			// Further compute formula
-			Vec3 intermediate = cross(rb->getInverseInertiaTensorRotated().transformVector(cross(x_a, n)), x_a) +
-				cross(bigMassFakeInertiaTensor.transformVector(cross(x_b, n)), x_b);
-			auto J = (-(1 + c) * v_rel_dot_n) / ((1 / rb->mass_m) + (1 / 12000) + dot(intermediate, n));
-
-			// Update
-
-			Vec3 Jn = J * n;
-
-			// Linear
-			rb->linearVelocity_v += Jn / rb->mass_m;
-
-			// Angular
-			rb->angularMomentum_L += cross(x_a, Jn);
-
-
-		}
-	}
-	*/
-
 }
 
 
@@ -392,19 +334,10 @@ void DiffusionSimulator::onClick(int x, int y)
 			Mat4 worldViewInv = Mat4(DUC->g_camera.GetWorldMatrix() * DUC->g_camera.GetViewMatrix());
 			worldViewInv = worldViewInv.inverse();
 
-			// Todo get actual screen width and height
+			// get actual screen width and height
 			auto windowWidth = DXUTGetWindowWidth();
 			auto windowHeight = DXUTGetWindowHeight();
-
 			//std::cout << "window: " << windowHeight << "; " << windowWidth << std::endl;
-
-			/*
-			RECT rect;
-			if (GetWindowRect(hwnd, &rect))
-			{
-				int width = rect.right - rect.left;
-				int height = rect.bottom - rect.top;
-			}*/
 
 			Vec3 position = Vec3(x, y, 0);
 			Vec3 halfScreen = Vec3(windowWidth/2, windowHeight/2, 1);
@@ -423,7 +356,6 @@ void DiffusionSimulator::onClick(int x, int y)
 			homoneneousPosition.z = cameraDistance;
 			homoneneousPosition.y = -0.4 * homoneneousPosition.z * homoneneousPosition.y;
 			homoneneousPosition.x = 0.77 * homoneneousPosition.z * homoneneousPosition.x;
-
 			//std::cout << "position : " << position << "; homoneneous position: " << homoneneousPosition << std::endl;
 
 			Vec3 worldPosition = worldViewInv.transformVector(homoneneousPosition);
@@ -436,7 +368,6 @@ void DiffusionSimulator::onClick(int x, int y)
 		}
 	}
 		if (chargingForce && duringCreationRigidBody != nullptr) {
-			// Todo change speed preview and tempereateur witch happens to be same thing xD
 			
 			// calculate
 			Point2D mouseDiff;
@@ -449,27 +380,16 @@ void DiffusionSimulator::onClick(int x, int y)
 				Vec3 inputView = Vec3((float)mouseDiff.x, (float)-mouseDiff.y, 0);
 				Vec3 inputWorld = worldViewInv.transformVectorNormal(inputView);
 
-				//std::cout << "changing rotation from " << duringCreationRigidBody->orientation_r << "to ";
-
-				//Quat change = Quat(inputWorld.x, inputWorld.y, inputWorld.z);
-				// std::cout << inputWorld << ", its now ";
-				//duringCreationRigidBody->orientation_r = change;
-
-
 				Vec3 up = Vec3(0, 1, 0);
-				//inputWorld = -1 * inputWorld;
-				Quat q;
-				Vec3 a = cross(up, inputWorld);// crossproduct(v1, v2);
-				//q.xyz = a;
-				q.x = a.x;
-				q.y = a.y;
-				q.z = a.z;
+				Quat rotationToMoveDirection;
+				Vec3 crossV = cross(up, inputWorld);
+				rotationToMoveDirection.x = crossV.x;
+				rotationToMoveDirection.y = crossV.y;
+				rotationToMoveDirection.z = crossV.z;
 
-				q.w = sqrt((dot(inputWorld, inputWorld)) * (dot(up,up))) + dot(inputWorld, up);
+				rotationToMoveDirection.w = sqrt((dot(inputWorld, inputWorld)) * (dot(up,up))) + dot(inputWorld, up);
 				
-
-				duringCreationRigidBody->orientation_r = q.unit();
-
+				duringCreationRigidBody->orientation_r = rotationToMoveDirection.unit();
 				//std::cout << duringCreationRigidBody->orientation_r << std::endl;
 			}
 		}
@@ -494,11 +414,7 @@ void DiffusionSimulator::onMouse(int x, int y)
 			worldViewInv = worldViewInv.inverse();
 			Vec3 inputView = Vec3((float)mouseDiff.x, (float)-mouseDiff.y, 0);
 			Vec3 inputWorld = worldViewInv.transformVectorNormal(inputView);
-			//std::cout << "Force Vec in world coords: " << inputWorld << std::endl;
-			 
-			// applyForceOnBody(id, getPositionOfRigidBody(id), inputWorld * -0.01);
-			// Todo this Force seems to just keep existing, it should'nt?
-
+			
 			duringCreationRigidBody->linearVelocity_v = inputWorld * -0.05;
 
 		}
