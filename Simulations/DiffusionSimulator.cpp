@@ -10,6 +10,7 @@ using namespace std;
 #define CULLING_PROJECTION_RADIUS 6
 #define WATER_ZERO_HEIGHT -0.5
 #define DAMPING 0.999
+#define WATER_COLLISION_FACTOR 0.2
 
 // TODO: Remove 
 #define ALPHA 15
@@ -203,6 +204,10 @@ void DiffusionSimulator::simulateTimestep_RB(float timeStep)
 	}
 }
 
+Real vec_length(Vec3 v) {
+	return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+
 void DiffusionSimulator::handleCollisions()
 {
 	// Handle collisions between rigid bodies
@@ -223,8 +228,9 @@ void DiffusionSimulator::handleCollisions()
 			if (info.isValid) {
 				rb->gridHit = true;
 
-				//T.set(gp->x, gp->y, T.get(gp->x, gp->y) + 1);
-				T.set(gp->x, gp->y, 1); // TODO
+				auto current = T.get(gp->x, gp->y);
+				auto impulse = rb->mass_m * vec_length(rb->linearVelocity_v);
+				T.set(gp->x, gp->y, current + impulse * WATER_COLLISION_FACTOR);
 			}
 		}
 	}
